@@ -8,16 +8,74 @@ import pandas as pd
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
-# --- Basic Agent Definition ---
-# ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
-class BasicAgent:
+# --- Advanced Agent Definition ---
+from smolagents import CodeAgent, HfApiModel, tool, DuckDuckGoSearchTool
+import tempfile
+
+@tool
+def download_task_file(task_id: str) -> str:
+    """
+    Downloads the file associated with a given task ID.
+    
+    Args:
+        task_id: The ID of the task to download the file for.
+        
+    Returns:
+        The local path to the downloaded file, or a message indicating no file or error.
+    """
+    url = f"{DEFAULT_API_URL}/files/{task_id}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 404:
+            return "No file found for this task_id."
+        response.raise_for_status()
+        
+        # Check disposition for filename
+        cd = response.headers.get("content-disposition")
+        filename = "downloaded_file"
+        if cd and "filename=" in cd:
+            import re
+            m = re.search(r"filename=(.+)", cd)
+            if m:
+                filename = m.group(1).strip("\"'")
+        
+        filepath = os.path.join(tempfile.gettempdir(), filename)
+        with open(filepath, "wb") as f:
+            f.write(response.content)
+        return f"File formally downloaded successfully to {filepath}."
+    except Exception as e:
+        return f"Error downloading file: {str(e)}"
+
+class AdvancedAgent:
     def __init__(self):
-        print("BasicAgent initialized.")
-    def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        print("AdvancedAgent initialized.")
+        # Make sure HF_TOKEN is in environment if needed, or rely on gradio oauth
+        self.model = HfApiModel("Qwen/Qwen2.5-Coder-32B-Instruct")
+        self.agent = CodeAgent(
+            model=self.model,
+            tools=[DuckDuckGoSearchTool(), download_task_file],
+            additional_authorized_imports=["pandas", "numpy", "PIL", "pytesseract", "json", "re", "math", "datetime", "PyPDF2"],
+            max_steps=10
+        )
+        self.sys_prompt = """You are an expert agent solving GAIA level 1 questions. 
+When asked a question, solve it by leveraging your code interpreter and tools. 
+IMPORTANT: Your final answer MUST be EXACTLY the answer, with NO prefix, NO introductory words. 
+Do not write "The answer is" or "Final Answer:". Just write the value or result.
+If the question is about an attached file, IMMEDIATELY call `download_task_file` with the provided task_id.
+"""
+
+    def __call__(self, question: str, task_id: str) -> str:
+        print(f"Agent received question for task {task_id}: {question[:50]}...")
+        prompt = self.sys_prompt + f"\n\nQuestion: {question}\nAssociated task_id: {task_id}"
+        try:
+            result = self.agent.run(prompt)
+            final_ans = str(result).strip(' "\'\n\\`').replace("FINAL ANSWER:", "").strip()
+            print(f"Agent returning answer: {final_ans}")
+            return final_ans
+        except Exception as e:
+            print(f"Agent failed to run: {e}")
+            return "ERROR"
+
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -40,7 +98,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
 
     # 1. Instantiate Agent ( modify this part to create your agent)
     try:
-        agent = BasicAgent()
+        agent = AdvancedAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
@@ -80,7 +138,8 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
             print(f"Skipping item with missing task_id or question: {item}")
             continue
         try:
-            submitted_answer = agent(question_text)
+            # We call the agent with both question and task_id
+            submitted_answer = agent(question_text, task_id)
             answers_payload.append({"task_id": task_id, "submitted_answer": submitted_answer})
             results_log.append({"Task ID": task_id, "Question": question_text, "Submitted Answer": submitted_answer})
         except Exception as e:

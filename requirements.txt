@@ -1,2 +1,10 @@
 gradio
+smolagents
+pandas
+duckduckgo-search
 requests
+pillow
+pytesseract
+pypdf2
+torch
+transformers
