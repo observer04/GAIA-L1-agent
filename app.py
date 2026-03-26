@@ -119,13 +119,13 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
              print("Fetched questions list is empty.")
              return "Fetched questions list is empty or invalid format.", None
         print(f"Fetched {len(questions_data)} questions.")
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching questions: {e}")
-        return f"Error fetching questions: {e}", None
     except requests.exceptions.JSONDecodeError as e:
          print(f"Error decoding JSON response from questions endpoint: {e}")
          print(f"Response text: {response.text[:500]}")
          return f"Error decoding server response for questions: {e}", None
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching questions: {e}")
+        return f"Error fetching questions: {e}", None
     except Exception as e:
         print(f"An unexpected error occurred fetching questions: {e}")
         return f"An unexpected error occurred fetching questions: {e}", None
