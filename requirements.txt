@@ -8,3 +8,4 @@ pytesseract
 pypdf2
 torch
 transformers
+ddgs
