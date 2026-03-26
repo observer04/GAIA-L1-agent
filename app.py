@@ -57,14 +57,25 @@ class AdvancedAgent:
         self.agent = CodeAgent(
             model=self.model,
             tools=[DuckDuckGoSearchTool(), download_task_file],
-            additional_authorized_imports=["pandas", "numpy", "PIL", "pytesseract", "json", "re", "math", "datetime", "PyPDF2"],
+            additional_authorized_imports=[
+                "pandas", "numpy", "PIL", "pytesseract", "json", "re", "math", 
+                "datetime", "PyPDF2", "sqlite3", "openpyxl", "pdfplumber", "bs4", "sympy"
+            ],
             max_steps=10
         )
+        
         self.sys_prompt = """You are an expert agent solving GAIA level 1 questions. 
 When asked a question, solve it by leveraging your code interpreter and tools. 
-IMPORTANT: Your final answer MUST be EXACTLY the answer, with NO prefix, NO introductory words. 
-Do not write "The answer is" or "Final Answer:". Just write the value or result.
 If the question is about an attached file, IMMEDIATELY call `download_task_file` with the provided task_id.
+
+IMPORTANT - FINAL ANSWER FORMAT:
+Your final text MUST exactly match the solution with NO prefix or conversational text.
+If the solution is a number, provide only the number. (e.g. 42)
+If the solution is a string, provide exactly the string. (e.g. John Doe)
+If the solution is a list, provide a comma-separated list without spaces or brackets. (e.g. apple,banana,orange)
+
+The final string MUST be prefixed by the literal exact string "FINAL ANSWER:".
+Example: FINAL ANSWER: 42
 """
 
     def __call__(self, question: str, task_id: str) -> str:
@@ -72,7 +83,12 @@ If the question is about an attached file, IMMEDIATELY call `download_task_file`
         prompt = self.sys_prompt + f"\n\nQuestion: {question}\nAssociated task_id: {task_id}"
         try:
             result = self.agent.run(prompt)
-            final_ans = str(result).strip(' "\'\n\\`').replace("FINAL ANSWER:", "").strip()
+            # Extremely robust string sanitation
+            final_ans = str(result)
+            if "FINAL ANSWER:" in final_ans:
+                final_ans = final_ans.split("FINAL ANSWER:")[-1].strip(' "\'\n\\`').strip()
+            else:
+                final_ans = final_ans.strip(' "\'\n\\`').strip()
             print(f"Agent returning answer: {final_ans}")
             return final_ans
         except Exception as e:
