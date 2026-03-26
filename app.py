@@ -50,7 +50,7 @@ class AdvancedAgent:
     def __init__(self):
         print("AdvancedAgent initialized.")
         # Make sure HF_TOKEN is in environment if needed, or rely on gradio oauth
-        self.model = ApiModel("Qwen/Qwen2.5-Coder-32B-Instruct")
+        self.model = ApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
         self.agent = CodeAgent(
             model=self.model,
             tools=[DuckDuckGoSearchTool(), download_task_file],
