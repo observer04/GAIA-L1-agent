@@ -9,7 +9,7 @@ import pandas as pd
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Advanced Agent Definition ---
-from smolagents import CodeAgent, ApiModel, tool, DuckDuckGoSearchTool
+from smolagents import CodeAgent, InferenceClientModel, tool, DuckDuckGoSearchTool
 import tempfile
 
 @tool
@@ -50,7 +50,10 @@ class AdvancedAgent:
     def __init__(self):
         print("AdvancedAgent initialized.")
         # Make sure HF_TOKEN is in environment if needed, or rely on gradio oauth
-        self.model = ApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
+        self.model = InferenceClientModel(
+            model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
+            token=os.getenv("HF_TOKEN")
+        )
         self.agent = CodeAgent(
             model=self.model,
             tools=[DuckDuckGoSearchTool(), download_task_file],
