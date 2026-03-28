@@ -1,0 +1,10 @@
+{
+  "$schema": "https://langgra.ph/schema/langgraph.json",
+  "dependencies": [
+    "."
+  ],
+  "env": ".env",
+  "graphs": {
+    "gaia_agent_v2": "agent.graph:build_graph_for_studio"
+  }
+}

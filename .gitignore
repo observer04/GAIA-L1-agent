@@ -1,3 +1,9 @@
 secrets/
 md_files/
 .env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.langgraph_api/
+artifacts/
