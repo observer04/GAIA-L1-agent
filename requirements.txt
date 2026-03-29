@@ -19,7 +19,8 @@ google-genai
 langchain-experimental
 langgraph
 langgraph-cli[inmem]
-langsmith
+langchain-huggingface
+langchain-tavily
 python-dotenv
 youtube-transcript-api
 pymupdf
