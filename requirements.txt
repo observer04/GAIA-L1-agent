@@ -4,8 +4,6 @@ pandas
 pillow
 pytesseract
 pypdf2
-torch
-transformers
 openpyxl
 pdfplumber
 beautifulsoup4
@@ -26,4 +24,3 @@ python-dotenv
 youtube-transcript-api
 pymupdf
 arxiv
-

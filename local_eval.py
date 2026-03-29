@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +35,7 @@ def evaluate_questions(
     questions: list[dict[str, Any]],
     run_label: str,
 ) -> dict[str, Any]:
-    started_at = datetime.now(UTC).isoformat()
+    started_at = datetime.now(timezone.utc).isoformat()
     results: list[dict[str, Any]] = []
 
     for item in questions:
@@ -87,7 +87,7 @@ def evaluate_questions(
     return {
         "run_label": run_label,
         "started_at": started_at,
-        "completed_at": datetime.now(UTC).isoformat(),
+        "completed_at": datetime.now(timezone.utc).isoformat(),
         "total_questions": len(results),
         "successful_runs": success_count,
         "avg_latency_seconds": avg_latency,
@@ -100,7 +100,7 @@ def evaluate_questions(
 
 def save_report(report: dict[str, Any], output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     path = output_dir / f"local_eval_{report['run_label']}_{timestamp}.json"
     path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return path

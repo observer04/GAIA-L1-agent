@@ -2,7 +2,7 @@ import os
 import json
 import threading
 from pathlib import Path
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -50,7 +50,7 @@ def _get_agent_code_url() -> str:
 
 def _cache_path_for_user(username: str) -> Path:
     SUBMISSION_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     safe_user = _safe_username(username)
     return SUBMISSION_CACHE_DIR / f"submission_cache_{safe_user}_{timestamp}.json"
 
@@ -225,7 +225,7 @@ def generate_answers_and_cache(profile: gr.OAuthProfile | None):
     cache_payload: dict[str, Any] = {
         "username": username,
         "agent_code": _get_agent_code_url(),
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "worker_count": _submission_max_workers(),
         "question_count": len(answers_payload),
         "answers": answers_payload,
