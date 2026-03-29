@@ -293,7 +293,7 @@ def submit_cached_answers(profile: gr.OAuthProfile | None):
 
 
 with gr.Blocks() as demo:
-    gr.Markdown("# GAIA Agent Evaluation Runner (LangGraph v2)")
+    gr.Markdown("# GAIA Agent Evaluation Runner (LangGraph v3)")
     gr.Markdown(
         """
         1. Login with your Hugging Face account.
