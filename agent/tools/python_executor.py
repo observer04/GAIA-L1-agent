@@ -4,9 +4,12 @@ import ast
 import contextlib
 import io
 import math
+import subprocess
 import statistics
 import traceback
 from typing import Any
+
+from .runtime import get_runtime_working_dir
 
 try:
     import pandas as pd
@@ -98,3 +101,59 @@ class StatefulPythonExecutor:
                 "ERROR: python execution failed "
                 f"({err.__class__.__name__}: {err})\n{trace}"
             )
+
+
+class BashCommandExecutor:
+    """Minimal shell executor with timeout and captured output."""
+
+    def __init__(self, timeout_seconds: int = 15) -> None:
+        self._timeout_seconds = max(1, int(timeout_seconds))
+
+    @staticmethod
+    def _strip_fences(command: str) -> str:
+        cleaned = (command or "").strip()
+        if cleaned.startswith("```bash"):
+            cleaned = cleaned[len("```bash") :]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[len("```") :]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[: -len("```")]
+        return cleaned.strip()
+
+    def run(self, command: str) -> str:
+        cleaned = self._strip_fences(command)
+        if not cleaned:
+            return "ERROR: empty bash command"
+
+        runtime_dir = get_runtime_working_dir().strip()
+        cwd = runtime_dir or None
+
+        try:
+            completed = subprocess.run(
+                cleaned,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=self._timeout_seconds,
+                cwd=cwd,
+            )
+        except subprocess.TimeoutExpired as err:
+            partial = (err.stdout or "").strip()
+            if err.stderr:
+                partial = f"{partial}\n{err.stderr.strip()}".strip()
+            return (
+                f"ERROR: bash command timed out after {self._timeout_seconds}s"
+                + (f"\n{partial}" if partial else "")
+            )
+        except Exception as err:  # noqa: BLE001
+            return f"ERROR: bash execution failed ({err.__class__.__name__}: {err})"
+
+        stdout = (completed.stdout or "").strip()
+        stderr = (completed.stderr or "").strip()
+        combined = f"{stdout}\n{stderr}".strip() if stderr else stdout
+
+        if completed.returncode != 0:
+            prefix = f"ERROR: bash command failed (exit {completed.returncode})"
+            return f"{prefix}\n{combined}".strip() if combined else prefix
+
+        return combined or "OK: bash command executed without output"

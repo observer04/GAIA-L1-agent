@@ -20,6 +20,13 @@ _UNCERTAIN_ANSWERS = {
     "n/a",
     "none",
 }
+_UNCERTAIN_FRAGMENTS = (
+    "cannot determine",
+    "can't determine",
+    "unable to determine",
+    "insufficient information",
+    "not enough information",
+)
 
 
 def has_final_answer_marker(raw_output: str) -> bool:
@@ -35,6 +42,12 @@ def is_unusable_answer(answer: str) -> bool:
         return True
     lowered = text.lower()
     if lowered in _UNCERTAIN_ANSWERS:
+        return True
+
+    compact = re.sub(r"[^a-z0-9]+", " ", lowered).strip()
+    if compact in {"i don t know", "i do not know", "idk", "not sure", "unknown", "n a", "none"}:
+        return True
+    if any(fragment in lowered for fragment in _UNCERTAIN_FRAGMENTS):
         return True
     if _ERROR_LIKE_PATTERN.match(text):
         return True
@@ -59,11 +72,26 @@ def normalize_answer(raw_output: str) -> str:
         if non_empty_lines:
             text = non_empty_lines[0]
 
+    if len(text) >= 2:
+        opening, closing = text[0], text[-1]
+        if (opening, closing) in {("(", ")"), ("[", "]"), ("{", "}")}:
+            inner = text[1:-1].strip()
+            if inner:
+                text = inner
+
     text = re.sub(r"\s+", " ", text).strip()
 
-    # Canonicalize plain numeric answers written with thousands separators.
-    if re.fullmatch(r"[-+]?\d{1,3}(,\d{3})+(\.\d+)?", text):
-        text = text.replace(",", "")
+    # Canonicalize plain numeric answers written with thousands separators/trailing zeros.
+    compact_numeric_source = re.sub(r"\s+", "", text)
+    numeric_candidate = compact_numeric_source.replace(",", "")
+    if re.fullmatch(r"[-+0-9,\.\s]+", text) and re.fullmatch(r"[-+]?\d+(\.\d+)?", numeric_candidate):
+        if "." in numeric_candidate:
+            numeric_candidate = numeric_candidate.rstrip("0").rstrip(".")
+        text = numeric_candidate
+    else:
+        text = re.sub(r"\s*,\s*", ", ", text)
+        text = re.sub(r",\s*,+", ", ", text)
+        text = text.strip()
 
     return text or "I don't know"
 

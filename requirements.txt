@@ -1,4 +1,4 @@
-gradio
+gradio[oauth]
 requests
 pandas
 pillow
@@ -17,9 +17,13 @@ langchain
 langchain-community
 langchain-core
 langchain-google-genai
+google-genai
 langchain-experimental
 langgraph
 langgraph-cli[inmem]
 langsmith
 python-dotenv
 youtube-transcript-api
+pymupdf
+arxiv
+
