@@ -308,6 +308,7 @@ class GaiaLangGraphAgent:
         if "before" in question_lc and "after" in question_lc and "number" in question_lc and "pitcher" in question_lc:
             normalized = re.sub(r"(\d)(Pitcher)", r"\1 \2", evidence, flags=re.IGNORECASE)
             normalized = re.sub(r"(Pitcher)([A-Z])", r"\1 \2", normalized)
+            normalized = re.sub(r"\*+", "", normalized)
 
             entry_pattern = re.compile(
                 r"(\d{1,2})\s*Pitcher\s+([A-Za-z][A-Za-z'\-]+)(?:\s*,\s*[A-Za-z][A-Za-z'\-]+)?",
@@ -330,6 +331,39 @@ class GaiaLangGraphAgent:
                 flags=re.IGNORECASE,
             )
             for num_raw, _given_raw, surname_raw in fallback_entry_pattern.findall(normalized):
+                try:
+                    number = int(num_raw)
+                except ValueError:
+                    continue
+                if number < 1 or number > 99:
+                    continue
+                surname = surname_raw.strip().strip(",")
+                if number not in entries and surname:
+                    entries[number] = surname
+
+            # Markdown/pipe table format such as:
+            # "| 18 | Kosei Yoshida | Pitcher |"
+            # "| 19 | Tamai, Taisho | Pitcher |"
+            table_name_order_pattern = re.compile(
+                r"\|\s*#?(\d{1,2})\s*\|\s*([A-Za-z][A-Za-z'\-]+)\s+([A-Za-z][A-Za-z'\-]+)\s*\|\s*Pitcher\b",
+                flags=re.IGNORECASE,
+            )
+            for num_raw, _given_raw, surname_raw in table_name_order_pattern.findall(normalized):
+                try:
+                    number = int(num_raw)
+                except ValueError:
+                    continue
+                if number < 1 or number > 99:
+                    continue
+                surname = surname_raw.strip().strip(",")
+                if number not in entries and surname:
+                    entries[number] = surname
+
+            table_comma_order_pattern = re.compile(
+                r"\|\s*#?(\d{1,2})\s*\|\s*([A-Za-z][A-Za-z'\-]+)\s*,\s*([A-Za-z][A-Za-z'\-]+)\s*\|\s*Pitcher\b",
+                flags=re.IGNORECASE,
+            )
+            for num_raw, surname_raw, _given_raw in table_comma_order_pattern.findall(normalized):
                 try:
                     number = int(num_raw)
                 except ValueError:

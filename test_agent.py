@@ -252,6 +252,26 @@ def test_heuristic_extraction_for_pitcher_before_after_mixed_roster_snippets():
     assert candidate == "Yamasaki, Uehara"
 
 
+def test_heuristic_extraction_for_pitcher_before_after_markdown_table():
+    question = (
+        "Who are the pitchers with the number before and after Taisho Tamai's number? "
+        "Use last names only."
+    )
+    tool_trace = [
+        {
+            "tool": "web_search",
+            "preview": (
+                "### Summary Table (2023 Season) | Number | Player | Position | "
+                "| :--- | :--- | :--- | | **18** | **Kosei Yoshida** | Pitcher | "
+                "| **19** | **Taisho Tamai** | Pitcher | | **20** | **Kenta Uehara** | Pitcher |"
+            ),
+        }
+    ]
+
+    candidate = GaiaLangGraphAgent._heuristic_answer_from_trace(question, tool_trace)
+    assert candidate == "Yoshida, Uehara"
+
+
 def test_heuristic_extraction_for_nasa_award_number():
     question = "Under what NASA award number was the work supported by?"
     tool_trace = [
