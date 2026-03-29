@@ -30,6 +30,14 @@ This branch starts a modular LangGraph-based GAIA agent implementation.
 1. Set required environment variables in `.env`:
    - `GOOGLE_API_KEY=...`
    - optional: `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY=...`, `LANGSMITH_PROJECT=gaia-agent-v2`
+   - optional tuning: `AGENT_MAX_ITERATIONS=12`, `AGENT_LEVEL1_MAX_ITERATIONS=8` (for tighter Level-1 loops), `GEMINI_TEMPERATURE=1.0`
+   - optional concurrent search routing:
+     - `SEARCH_PROVIDERS=tavily,google,ddg`
+     - `SEARCH_PROVIDER_TIMEOUT_SECONDS=8`
+     - `TAVILY_API_KEY=...`
+       - optional Tavily tuning: `TAVILY_SEARCH_DEPTH=basic|advanced`, `TAVILY_INCLUDE_ANSWER=true|false`, `TAVILY_INCLUDE_RAW_CONTENT=true|false`
+       - Google provider (primary path): `GOOGLE_API_KEY=...` (uses Gemini Google Search tool grounding)
+       - optional Google fallback path: `GOOGLE_SEARCH_API_KEY=...`, `GOOGLE_CSE_ID=...` (Custom Search API)
 2. Install dependencies from `requirements.txt`.
 3. Run the app locally for end-to-end checks.
 4. Use LangGraph Studio with `langgraph.json` to inspect multi-turn traces and tool routing.
@@ -38,3 +46,20 @@ This branch starts a modular LangGraph-based GAIA agent implementation.
 
 - Submission answers are normalized to avoid prefix/wrapper mismatches.
 - `tools.py` remains as a compatibility re-export layer to avoid breaking existing imports/tests.
+
+### Submission flow (delay mitigation)
+
+The UI now uses a two-step submission process:
+
+1. **Generate Answers (Cache Only)**
+   - Runs the agent across all benchmark questions.
+   - Stores generated answers in `artifacts/submission_cache/`.
+2. **Submit Cached Answers**
+   - Loads the latest cache for the logged-in user.
+   - Submits in a separate action.
+
+This avoids rerunning the whole benchmark every time submit is clicked and makes long runs more manageable.
+
+Optional async acceleration:
+
+- Set `GAIA_SUBMISSION_MAX_WORKERS` (default `2`, max `4`) to control threaded answer generation.
