@@ -42,6 +42,12 @@ def test_normalize_answer_normalizes_list_spacing():
     assert normalize_answer("FINAL ANSWER: apple,banana ,  cherry") == "apple, banana, cherry"
 
 
+def test_normalize_answer_preserves_numeric_comma_list_when_question_requests_it():
+    question = "Please provide just the page numbers as a comma-delimited list in ascending order."
+    raw = "FINAL ANSWER: 132,133,134,197,245"
+    assert normalize_answer(raw, question=question) == "132, 133, 134, 197, 245"
+
+
 def test_normalize_answer_takes_first_meaningful_line():
     raw = "FINAL ANSWER: Paris\nReasoning: capital city"
     assert normalize_answer(raw) == "Paris"

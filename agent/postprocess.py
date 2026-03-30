@@ -29,6 +29,22 @@ _UNCERTAIN_FRAGMENTS = (
 )
 
 
+def _question_requests_comma_delimited_list(question: str) -> bool:
+    lowered = str(question or "").lower()
+    if not lowered:
+        return False
+
+    list_markers = (
+        "comma-delimited",
+        "comma delimited",
+        "comma-separated",
+        "comma separated",
+        "as a comma",
+        "list in ascending order",
+    )
+    return any(marker in lowered for marker in list_markers)
+
+
 def has_final_answer_marker(raw_output: str) -> bool:
     text = str(raw_output or "").strip()
     if not text:
@@ -54,7 +70,7 @@ def is_unusable_answer(answer: str) -> bool:
     return False
 
 
-def normalize_answer(raw_output: str) -> str:
+def normalize_answer(raw_output: str, question: str = "") -> str:
     """Normalize model output into a strict exact-match candidate answer."""
     text = str(raw_output or "").strip()
     if not text:
@@ -81,10 +97,16 @@ def normalize_answer(raw_output: str) -> str:
 
     text = re.sub(r"\s+", " ", text).strip()
 
+    preserve_comma_list = _question_requests_comma_delimited_list(question)
+
     # Canonicalize plain numeric answers written with thousands separators/trailing zeros.
     compact_numeric_source = re.sub(r"\s+", "", text)
     numeric_candidate = compact_numeric_source.replace(",", "")
-    if re.fullmatch(r"[-+0-9,\.\s]+", text) and re.fullmatch(r"[-+]?\d+(\.\d+)?", numeric_candidate):
+    if (
+        not preserve_comma_list
+        and re.fullmatch(r"[-+0-9,\.\s]+", text)
+        and re.fullmatch(r"[-+]?\d+(\.\d+)?", numeric_candidate)
+    ):
         if "." in numeric_candidate:
             numeric_candidate = numeric_candidate.rstrip("0").rstrip(".")
         text = numeric_candidate

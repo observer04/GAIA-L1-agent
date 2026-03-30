@@ -288,7 +288,7 @@ class GaiaLangGraphAgent:
             first_line = raw.splitlines()[0].strip() if raw.splitlines() else raw
             raw = f"FINAL ANSWER: {first_line}"
 
-        candidate = normalize_answer(raw)
+        candidate = normalize_answer(raw, question=question)
         if candidate and not is_unusable_answer(candidate):
             return candidate
         return ""
@@ -644,7 +644,7 @@ class GaiaLangGraphAgent:
         last_ai = _latest_ai_message(messages)
         raw_output = _extract_message_content(last_ai) if last_ai else ""
         has_final_marker = has_final_answer_marker(raw_output)
-        candidate = normalize_answer(raw_output) if has_final_marker else ""
+        candidate = normalize_answer(raw_output, question=question) if has_final_marker else ""
 
         if candidate and not is_unusable_answer(candidate):
             return {
@@ -1050,7 +1050,7 @@ class GaiaLangGraphAgent:
             if not candidate:
                 messages = result.get("messages", [])
                 last_content = _extract_message_content(messages[-1]) if messages else ""
-                candidate = normalize_answer(last_content)
+                candidate = normalize_answer(last_content, question=question)
 
             return {
                 "status": "success",
