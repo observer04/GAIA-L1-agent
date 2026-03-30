@@ -173,6 +173,16 @@ def test_evidence_check_stops_early_when_required_attachment_missing():
     assert result.get("stop_reason") == "task_file_unavailable"
 
 
+def test_attachment_requirement_false_for_plain_video_url_without_attachment():
+    question = "In the video https://www.youtube.com/watch?v=L1vXCYZAYYM, what is the highest number of bird species on camera?"
+    assert GaiaLangGraphAgent._question_likely_requires_attachment(question, "") is False
+
+
+def test_attachment_requirement_true_for_explicit_attached_file_phrase_without_filename():
+    question = "I've attached a file called Homework.mp3. Please transcribe it and return page numbers only."
+    assert GaiaLangGraphAgent._question_likely_requires_attachment(question, "") is True
+
+
 def test_evidence_check_pushes_image_tool_first_when_image_available():
     agent = _make_agent_for_evidence_tests(max_iterations=12)
     state = {

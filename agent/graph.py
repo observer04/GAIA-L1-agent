@@ -217,19 +217,20 @@ class GaiaLangGraphAgent:
             return True
 
         lowered = str(question or "").lower()
-        attachment_markers = (
-            "attached",
+        explicit_attachment_markers = (
             "attachment",
-            "image",
-            "audio",
-            "video",
-            "excel",
-            "spreadsheet",
-            "csv",
-            "pdf",
-            "file provided",
+            "attached",
+            "attached file",
+            "attached image",
+            "attached audio",
+            "attached video",
+            "provided file",
+            "uploaded file",
+            "file called",
+            "file named",
+            "see the file",
         )
-        return any(marker in lowered for marker in attachment_markers)
+        return any(marker in lowered for marker in explicit_attachment_markers)
 
     def _iteration_budget_for_level(self, level: str) -> int:
         budget = int(self.config.max_iterations)

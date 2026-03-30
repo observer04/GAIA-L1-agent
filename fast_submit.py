@@ -14,6 +14,7 @@ import requests
 
 from agent import GaiaLangGraphAgent, normalize_answer
 from agent.config import AgentConfig
+from agent.postprocess import is_unusable_answer
 
 
 SUBMISSION_CACHE_DIR = Path("artifacts/submission_cache")
@@ -255,6 +256,7 @@ def _generate_answers_concurrently(
     worker_count: int,
     resume: bool,
     resume_cache_path: Path | None,
+    rerun_unusable_resume_answers: bool,
     save_every: int,
     limit: int,
 ) -> tuple[dict[str, Any], Path]:
@@ -293,6 +295,10 @@ def _generate_answers_concurrently(
             continue
 
         normalized_answer = normalize_answer(cached_answer.get("submitted_answer", "I don't know"), question=question)
+        if rerun_unusable_resume_answers and is_unusable_answer(normalized_answer):
+            pending_entries.append(entry)
+            continue
+
         answers_by_index[idx] = {"task_id": task_id, "submitted_answer": normalized_answer}
 
         cached_log = resumed_log_map.get(task_id, {})
@@ -520,6 +526,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable resume from previous cache.",
     )
+    parser.add_argument(
+        "--keep-idk-resume",
+        action="store_true",
+        help="Keep resumed 'I don't know' answers instead of rerunning them.",
+    )
 
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
@@ -573,6 +584,7 @@ def main() -> None:
         worker_count=worker_count,
         resume=not args.no_resume,
         resume_cache_path=explicit_cache_path,
+        rerun_unusable_resume_answers=not args.keep_idk_resume,
         save_every=max(1, int(args.save_every)),
         limit=max(0, int(args.limit)),
     )

@@ -77,5 +77,6 @@ When local Gradio generation is too slow, use the CLI runner that mirrors the sa
 Notes:
 
 - Username is resolved from `HF_TOKEN` / `HUGGINGFACEHUB_API_TOKEN` if `--username` is omitted.
-- Resume is enabled by default (it reuses your latest cache and only runs missing tasks).
+- Resume is enabled by default and reruns cached unusable answers (e.g., `I don't know`) automatically.
+- To keep prior IDK answers during resume, pass `--keep-idk-resume`.
 - You can tune worker count with `--workers` or env var `GAIA_FAST_SUBMISSION_MAX_WORKERS`.
