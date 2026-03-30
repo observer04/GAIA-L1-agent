@@ -38,6 +38,8 @@ This branch starts a modular LangGraph-based GAIA agent implementation.
        - optional Tavily tuning: `TAVILY_SEARCH_DEPTH=basic|advanced`, `TAVILY_INCLUDE_ANSWER=true|false`, `TAVILY_INCLUDE_RAW_CONTENT=true|false`
        - Google provider (primary path): `GOOGLE_API_KEY=...` (uses Gemini Google Search tool grounding)
        - optional Google fallback path: `GOOGLE_SEARCH_API_KEY=...`, `GOOGLE_CSE_ID=...` (Custom Search API)
+   - optional attachment fallback for `/files/{task_id}` outages:
+     - `HF_TOKEN=...` (or `HUGGINGFACEHUB_API_TOKEN=...`) with accepted access to `gaia-benchmark/GAIA`
 2. Install dependencies from `requirements.txt`.
 3. Run the app locally for end-to-end checks.
 4. Use LangGraph Studio with `langgraph.json` to inspect multi-turn traces and tool routing.

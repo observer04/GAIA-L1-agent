@@ -13,6 +13,7 @@ from agent.tools.core import (
     _resolve_search_providers,
     _search_google_custom_search_hits,
     _url_dedupe_key,
+    download_task_file_raw,
     web_search,
 )
 
@@ -191,11 +192,19 @@ def test_task_file_fetch_short_circuits_when_required_attachment_missing(
     monkeypatch: pytest.MonkeyPatch,
 ):
     agent = _make_agent_for_evidence_tests(max_iterations=12)
+    capture: dict[str, str] = {}
 
-    monkeypatch.setattr(
-        "agent.graph.download_task_file_raw",
-        lambda task_id, api_url=None, destination_dir=None: {"status": "no_file", "message": "NO_FILE"},
-    )
+    def _stub_download(
+        task_id: str,
+        api_url: str | None = None,
+        destination_dir: str | None = None,
+        expected_filename: str = "",
+    ):
+        capture["task_id"] = task_id
+        capture["expected_filename"] = expected_filename
+        return {"status": "no_file", "message": "NO_FILE"}
+
+    monkeypatch.setattr("agent.graph.download_task_file_raw", _stub_download)
 
     state = {
         "task_id": "task-1",
@@ -206,8 +215,61 @@ def test_task_file_fetch_short_circuits_when_required_attachment_missing(
     }
 
     result = agent._task_file_fetch_node(cast(GaiaAgentState, state))
+    assert capture.get("task_id") == "task-1"
+    assert capture.get("expected_filename") == "task-1.png"
     assert result.get("candidate_answer") == "I don't know"
     assert result.get("stop_reason") == "task_file_unavailable"
+
+
+def test_download_task_file_raw_uses_dataset_fallback_on_primary_404(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class _PrimaryNotFoundResponse:
+        status_code = 404
+        headers = {}
+        content = b""
+
+        @staticmethod
+        def raise_for_status() -> None:
+            raise RuntimeError("should not be called for 404 path")
+
+    monkeypatch.setattr(
+        "agent.tools.core.requests.get",
+        lambda *args, **kwargs: _PrimaryNotFoundResponse(),
+    )
+
+    captured: dict[str, str] = {}
+
+    def _fallback(
+        task_id: str,
+        destination_dir: str | None = None,
+        expected_filename: str = "",
+    ):
+        captured["task_id"] = task_id
+        captured["destination_dir"] = str(destination_dir or "")
+        captured["expected_filename"] = expected_filename
+        return {
+            "status": "downloaded",
+            "path": "/tmp/fallback.png",
+            "filename": "fallback.png",
+            "message": "OK",
+            "source": "gaia_dataset",
+        }
+
+    monkeypatch.setattr("agent.tools.core._download_task_file_from_gaia_dataset", _fallback)
+
+    result = download_task_file_raw(
+        task_id="task-404",
+        api_url="https://example.invalid",
+        destination_dir="/tmp",
+        expected_filename="task-404.png",
+    )
+
+    assert captured.get("task_id") == "task-404"
+    assert captured.get("destination_dir") == "/tmp"
+    assert captured.get("expected_filename") == "task-404.png"
+    assert result.get("status") == "downloaded"
+    assert result.get("source") == "gaia_dataset"
 
 
 def test_heuristic_extraction_for_pitcher_before_after():

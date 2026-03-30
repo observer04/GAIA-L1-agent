@@ -24,6 +24,46 @@ from .runtime import get_runtime_task_id, get_runtime_working_dir
 
 DEFAULT_API_URL = AgentConfig.from_env().api_url
 
+_GAIA_DATASET_ID = "gaia-benchmark/GAIA"
+_GAIA_DATASET_RESOLVE_MAIN_URL = "https://huggingface.co/datasets/gaia-benchmark/GAIA/resolve/main"
+_GAIA_DATASET_ROWS_URL = "https://datasets-server.huggingface.co/rows"
+_GAIA_DATASET_DEFAULT_CONFIG = "2023_all"
+_GAIA_DATASET_DEFAULT_SPLIT = "validation"
+_GAIA_DATASET_ROWS_PAGE_SIZE = 100
+_GAIA_ATTACHMENT_COMMON_EXTENSIONS = (
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".bmp",
+    ".gif",
+    ".pdf",
+    ".csv",
+    ".tsv",
+    ".xlsx",
+    ".xls",
+    ".zip",
+    ".docx",
+    ".pptx",
+    ".json",
+    ".jsonld",
+    ".txt",
+    ".mp3",
+    ".wav",
+    ".m4a",
+    ".flac",
+    ".ogg",
+    ".aac",
+    ".pdb",
+)
+_HF_TOKEN_ENV_KEYS = (
+    "HF_TOKEN",
+    "HUGGINGFACEHUB_API_TOKEN",
+    "HUGGINGFACE_TOKEN",
+    "HUGGING_FACE_HUB_TOKEN",
+)
+_GAIA_ATTACHMENT_INDEX_CACHE: dict[str, dict[str, dict[str, str]]] = {}
+
 _python_executor = StatefulPythonExecutor()
 _bash_executor = BashCommandExecutor(timeout_seconds=15)
 _VLM_CLIENTS: dict[str, ChatGoogleGenerativeAI] = {}
@@ -1191,10 +1231,319 @@ def _fetch_with_jina_mirror(url: str, max_chars: int) -> str:
         return ""
 
 
+def _hf_token_from_env() -> str:
+    for env_key in _HF_TOKEN_ENV_KEYS:
+        token = str(os.getenv(env_key, "") or "").strip()
+        if token:
+            return token
+    return ""
+
+
+def _hf_dataset_auth_headers() -> dict[str, str]:
+    token = _hf_token_from_env()
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _gaia_dataset_configs() -> list[str]:
+    raw_value = str(os.getenv("GAIA_DATASET_CONFIGS", _GAIA_DATASET_DEFAULT_CONFIG) or "").strip()
+    configs: list[str] = []
+    for item in raw_value.split(","):
+        normalized = item.strip()
+        if not normalized:
+            continue
+        if normalized not in configs:
+            configs.append(normalized)
+
+    if not configs:
+        configs.append(_GAIA_DATASET_DEFAULT_CONFIG)
+    return configs
+
+
+def _gaia_dataset_split() -> str:
+    split = str(os.getenv("GAIA_DATASET_SPLIT", _GAIA_DATASET_DEFAULT_SPLIT) or "").strip()
+    return split or _GAIA_DATASET_DEFAULT_SPLIT
+
+
+def _normalize_gaia_relative_path(path_value: str) -> str:
+    raw = str(path_value or "").strip()
+    if not raw:
+        return ""
+
+    if raw.lower().startswith(("http://", "https://")):
+        if "/resolve/main/" in raw:
+            raw = raw.split("/resolve/main/", 1)[1]
+        else:
+            parsed = urlparse(raw)
+            raw = parsed.path
+
+    raw = raw.lstrip("/")
+
+    for prefix in (
+        "datasets/gaia-benchmark/GAIA/",
+        "gaia-benchmark/GAIA/",
+        "resolve/main/",
+        "blob/main/",
+    ):
+        if raw.startswith(prefix):
+            raw = raw[len(prefix):]
+
+    return raw.strip()
+
+
+def _gaia_attachment_cache_key(auth_headers: dict[str, str], configs: list[str], split: str) -> str:
+    auth_mode = "auth" if auth_headers.get("Authorization") else "anon"
+    return f"{auth_mode}|{','.join(configs)}|{split}"
+
+
+def _build_gaia_attachment_index(auth_headers: dict[str, str]) -> tuple[dict[str, dict[str, str]], str]:
+    configs = _gaia_dataset_configs()
+    split = _gaia_dataset_split()
+    cache_key = _gaia_attachment_cache_key(auth_headers, configs, split)
+
+    cached = _GAIA_ATTACHMENT_INDEX_CACHE.get(cache_key)
+    if cached is not None:
+        return cached, ""
+
+    request_headers = dict(REQUEST_HEADERS)
+    request_headers.update(auth_headers)
+
+    attachment_index: dict[str, dict[str, str]] = {}
+    errors: list[str] = []
+
+    for config_name in configs:
+        offset = 0
+        while True:
+            params = {
+                "dataset": _GAIA_DATASET_ID,
+                "config": config_name,
+                "split": split,
+                "offset": offset,
+                "length": _GAIA_DATASET_ROWS_PAGE_SIZE,
+            }
+
+            try:
+                response = requests.get(
+                    _GAIA_DATASET_ROWS_URL,
+                    params=params,
+                    timeout=30,
+                    headers=request_headers,
+                )
+            except requests.RequestException as err:
+                errors.append(f"{config_name}: {err}")
+                break
+
+            if response.status_code in {401, 403}:
+                errors.append(
+                    f"{config_name}: dataset access denied (status {response.status_code})"
+                )
+                break
+
+            try:
+                response.raise_for_status()
+            except requests.RequestException as err:
+                errors.append(f"{config_name}: {err}")
+                break
+
+            payload_raw = response.json()
+            payload = payload_raw if isinstance(payload_raw, dict) else {}
+            rows = payload.get("rows", [])
+            if not isinstance(rows, list) or not rows:
+                break
+
+            for row_item in rows:
+                if not isinstance(row_item, dict):
+                    continue
+                row_data = row_item.get("row")
+                if not isinstance(row_data, dict):
+                    continue
+
+                row_task_id = str(row_data.get("task_id", "") or "").strip()
+                if not row_task_id:
+                    continue
+
+                row_file_name = _safe_filename(str(row_data.get("file_name", "") or ""), "")
+                row_file_path = _normalize_gaia_relative_path(str(row_data.get("file_path", "") or ""))
+
+                if not row_file_path and row_file_name:
+                    row_file_path = _normalize_gaia_relative_path(f"2023/validation/{row_file_name}")
+
+                if not row_file_name and not row_file_path:
+                    continue
+
+                attachment_index[row_task_id] = {
+                    "file_name": row_file_name,
+                    "file_path": row_file_path,
+                    "config": config_name,
+                    "split": split,
+                }
+
+            total_rows_raw = payload.get("num_rows_total")
+            if isinstance(total_rows_raw, int):
+                total_rows = total_rows_raw
+            else:
+                total_rows_text = str(total_rows_raw).strip() if total_rows_raw is not None else ""
+                total_rows = int(total_rows_text) if total_rows_text.isdigit() else 0
+
+            offset += len(rows)
+            if total_rows and offset >= total_rows:
+                break
+            if len(rows) < _GAIA_DATASET_ROWS_PAGE_SIZE:
+                break
+
+    _GAIA_ATTACHMENT_INDEX_CACHE[cache_key] = attachment_index
+    return attachment_index, "; ".join(errors)
+
+
+def _gaia_attachment_entry_for_task(task_id: str, auth_headers: dict[str, str]) -> tuple[dict[str, str], str]:
+    index, load_errors = _build_gaia_attachment_index(auth_headers=auth_headers)
+    return dict(index.get(task_id, {})), load_errors
+
+
+def _gaia_candidate_attachment_paths(
+    task_id: str,
+    expected_filename: str,
+    entry: dict[str, str],
+) -> list[str]:
+    candidates: list[str] = []
+
+    def add_candidate(raw_path: str) -> None:
+        normalized = _normalize_gaia_relative_path(raw_path)
+        if not normalized:
+            return
+        if normalized not in candidates:
+            candidates.append(normalized)
+
+    indexed_path = str(entry.get("file_path", "") or "").strip()
+    indexed_name = _safe_filename(str(entry.get("file_name", "") or ""), "")
+    safe_expected_name = _safe_filename(str(expected_filename or ""), "")
+
+    if indexed_path:
+        add_candidate(indexed_path)
+
+    for name in (indexed_name, safe_expected_name):
+        if not name:
+            continue
+        add_candidate(name)
+        add_candidate(f"2023/validation/{name}")
+        add_candidate(f"validation/{name}")
+
+    preferred_ext = Path(safe_expected_name or indexed_name).suffix.lower().strip()
+    safe_task_id = str(task_id or "").strip()
+    if safe_task_id and preferred_ext:
+        add_candidate(f"2023/validation/{safe_task_id}{preferred_ext}")
+
+    if safe_task_id:
+        for extension in _GAIA_ATTACHMENT_COMMON_EXTENSIONS:
+            add_candidate(f"2023/validation/{safe_task_id}{extension}")
+
+    return candidates
+
+
+def _download_task_file_from_gaia_dataset(
+    task_id: str,
+    destination_dir: str | None = None,
+    expected_filename: str = "",
+) -> dict[str, Any]:
+    safe_task_id = str(task_id or "").strip()
+    if not safe_task_id:
+        return {"status": "error", "message": "task_id is empty"}
+
+    auth_headers = _hf_dataset_auth_headers()
+    request_headers = dict(REQUEST_HEADERS)
+    request_headers.update(auth_headers)
+
+    entry, load_errors = _gaia_attachment_entry_for_task(safe_task_id, auth_headers=auth_headers)
+    candidate_paths = _gaia_candidate_attachment_paths(
+        task_id=safe_task_id,
+        expected_filename=expected_filename,
+        entry=entry,
+    )
+
+    if not candidate_paths:
+        if load_errors:
+            return {
+                "status": "error",
+                "message": f"GAIA dataset fallback index lookup failed ({load_errors})",
+            }
+        return {"status": "no_file", "message": "NO_FILE"}
+
+    output_dir = Path(destination_dir) if destination_dir else _default_download_dir()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    last_request_error = ""
+    auth_required = False
+
+    for relative_path in candidate_paths:
+        resolved_path = relative_path.lstrip("/")
+        url = f"{_GAIA_DATASET_RESOLVE_MAIN_URL}/{resolved_path}"
+
+        try:
+            response = requests.get(url, timeout=60, headers=request_headers)
+        except requests.RequestException as err:
+            last_request_error = str(err)
+            continue
+
+        if response.status_code in {401, 403}:
+            auth_required = True
+            continue
+
+        if response.status_code == 404:
+            continue
+
+        try:
+            response.raise_for_status()
+        except requests.RequestException as err:
+            last_request_error = str(err)
+            continue
+
+        filename = _safe_filename(Path(resolved_path).name, f"task_file_{safe_task_id}")
+        destination = output_dir / filename
+        with destination.open("wb") as handle:
+            handle.write(response.content)
+
+        return {
+            "status": "downloaded",
+            "path": str(destination.resolve()),
+            "filename": filename,
+            "message": "OK",
+            "source": "gaia_dataset",
+            "source_path": resolved_path,
+        }
+
+    if auth_required and not auth_headers.get("Authorization"):
+        return {
+            "status": "error",
+            "message": (
+                "GAIA dataset fallback requires a Hugging Face token. "
+                "Set HF_TOKEN (or HUGGINGFACEHUB_API_TOKEN)."
+            ),
+        }
+
+    if auth_required:
+        return {
+            "status": "error",
+            "message": (
+                "GAIA dataset fallback access denied. Ensure the token has accepted "
+                "gated dataset terms for gaia-benchmark/GAIA."
+            ),
+        }
+
+    if last_request_error:
+        return {
+            "status": "error",
+            "message": f"GAIA dataset fallback download failed ({last_request_error})",
+        }
+
+    return {"status": "no_file", "message": "NO_FILE"}
+
+
 def download_task_file_raw(
     task_id: str,
     api_url: str | None = None,
     destination_dir: str | None = None,
+    expected_filename: str = "",
 ) -> Dict[str, Any]:
     """Download task file with structured status for use in both graph and tools."""
     safe_task_id = (task_id or "").strip()
@@ -1206,8 +1555,22 @@ def download_task_file_raw(
 
     try:
         response = requests.get(url, timeout=60)
-        if response.status_code == 404:
-            return {"status": "no_file", "message": "NO_FILE"}
+        if response.status_code in {401, 403, 404}:
+            fallback_result = _download_task_file_from_gaia_dataset(
+                task_id=safe_task_id,
+                destination_dir=destination_dir,
+                expected_filename=expected_filename,
+            )
+
+            if fallback_result.get("status") == "downloaded":
+                return fallback_result
+
+            if response.status_code == 404 and fallback_result.get("status") == "no_file":
+                return {"status": "no_file", "message": "NO_FILE"}
+
+            if fallback_result.get("status") in {"no_file", "error"}:
+                return fallback_result
+
         response.raise_for_status()
 
         disposition = response.headers.get("content-disposition", "")
@@ -1242,6 +1605,7 @@ def download_task_file(task_id: str = "") -> str:
         task_id=safe_task_id,
         api_url=DEFAULT_API_URL,
         destination_dir=get_runtime_working_dir().strip() or None,
+        expected_filename="",
     )
 
     if result.get("status") == "downloaded":
@@ -1573,6 +1937,8 @@ def download_url_file(url: str, filename: str = "") -> str:
 
     lower_url = cleaned_url.lower()
     candidate_task_id = _extract_gaia_task_id(cleaned_url) or get_runtime_task_id().strip()
+    parsed_url = urlparse(cleaned_url)
+    candidate_expected_filename = _safe_filename(Path(parsed_url.path).name, "")
 
     # GAIA dataset attachment URLs may be inaccessible directly in some environments.
     if "huggingface.co/datasets/gaia-benchmark/gaia" in lower_url and candidate_task_id:
@@ -1580,6 +1946,7 @@ def download_url_file(url: str, filename: str = "") -> str:
             task_id=candidate_task_id,
             api_url=DEFAULT_API_URL,
             destination_dir=get_runtime_working_dir().strip() or None,
+            expected_filename=candidate_expected_filename,
         )
         if fallback_result.get("status") == "downloaded":
             return str(fallback_result.get("path"))
@@ -1606,6 +1973,7 @@ def download_url_file(url: str, filename: str = "") -> str:
                 task_id=candidate_task_id,
                 api_url=DEFAULT_API_URL,
                 destination_dir=get_runtime_working_dir().strip() or None,
+                expected_filename=candidate_expected_filename,
             )
             if fallback_result.get("status") == "downloaded":
                 return str(fallback_result.get("path"))

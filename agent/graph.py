@@ -507,6 +507,7 @@ class GaiaLangGraphAgent:
             task_id=task_id,
             api_url=self.config.api_url,
             destination_dir=state.get("working_dir") or None,
+            expected_filename=file_name,
         )
 
         status = result.get("status")
