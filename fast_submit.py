@@ -329,6 +329,46 @@ def _logs_by_task_from_cache(cache_payload: dict[str, Any]) -> dict[str, dict[st
     return mapping
 
 
+def _historical_usable_answers_for_user(username: str) -> dict[str, dict[str, Any]]:
+    safe_user = _safe_username(username)
+    cache_files = sorted(SUBMISSION_CACHE_DIR.glob(f"submission_cache_{safe_user}_*.json"))
+
+    history: dict[str, dict[str, Any]] = {}
+    for cache_path in cache_files:
+        try:
+            payload = _load_submission_cache(cache_path)
+        except Exception:
+            continue
+
+        answer_map = _answers_by_task_from_cache(payload)
+        log_map = _logs_by_task_from_cache(payload)
+
+        for task_id, answer_item in answer_map.items():
+            submitted_answer = str(answer_item.get("submitted_answer", "")).strip()
+            if not submitted_answer or is_unusable_answer(submitted_answer):
+                continue
+
+            log_item = log_map.get(task_id, {})
+            if not isinstance(log_item, dict):
+                log_item = {}
+
+            stop_reason = str(log_item.get("Stop Reason", "")).strip().lower()
+            status = str(log_item.get("Status", "")).strip().lower()
+
+            if status and status not in {"success", "resumed", "resumed_history"}:
+                continue
+            if "timeout" in stop_reason or stop_reason.startswith("task_process_error"):
+                continue
+
+            history[task_id] = {
+                "submitted_answer": submitted_answer,
+                "log": log_item,
+                "cache_path": str(cache_path),
+            }
+
+    return history
+
+
 def _cache_payload_from_state(
     username: str,
     worker_count: int,
@@ -366,6 +406,7 @@ def _generate_answers_concurrently(
     resume: bool,
     resume_cache_path: Path | None,
     rerun_unusable_resume_answers: bool,
+    use_history_fallback: bool,
     task_timeout_seconds: int,
     save_every: int,
     limit: int,
@@ -381,6 +422,9 @@ def _generate_answers_concurrently(
     resumed_from = ""
     resumed_answer_map: dict[str, dict[str, str]] = {}
     resumed_log_map: dict[str, dict[str, Any]] = {}
+    history_answer_map: dict[str, dict[str, Any]] = {}
+    resumed_from_cache_count = 0
+    restored_from_history_count = 0
 
     if resume:
         source_cache = resume_cache_path
@@ -392,6 +436,9 @@ def _generate_answers_concurrently(
             resumed_log_map = _logs_by_task_from_cache(payload)
             resumed_from = str(source_cache)
 
+    if use_history_fallback:
+        history_answer_map = _historical_usable_answers_for_user(username=username)
+
     pending_entries: list[dict[str, Any]] = []
     for entry in entries:
         idx = int(entry["index"])
@@ -401,15 +448,64 @@ def _generate_answers_concurrently(
 
         cached_answer = resumed_answer_map.get(task_id)
         if cached_answer is None:
+            historical_answer = history_answer_map.get(task_id)
+            if historical_answer is not None:
+                normalized_answer = normalize_answer(
+                    historical_answer.get("submitted_answer", "I don't know"),
+                    question=question,
+                )
+                if not is_unusable_answer(normalized_answer):
+                    answers_by_index[idx] = {"task_id": task_id, "submitted_answer": normalized_answer}
+                    historical_log = historical_answer.get("log", {})
+                    if not isinstance(historical_log, dict):
+                        historical_log = {}
+                    logs_by_index[idx] = {
+                        "Task ID": task_id,
+                        "Submitted Answer": normalized_answer,
+                        "Level": level,
+                        "Latency (s)": historical_log.get("Latency (s)", ""),
+                        "Attempts": historical_log.get("Attempts", ""),
+                        "Stop Reason": historical_log.get("Stop Reason", "history_fallback"),
+                        "Task File Status": historical_log.get("Task File Status", ""),
+                        "Status": "resumed_history",
+                        "Source Cache": historical_answer.get("cache_path", ""),
+                    }
+                    restored_from_history_count += 1
+                    continue
             pending_entries.append(entry)
             continue
 
         normalized_answer = normalize_answer(cached_answer.get("submitted_answer", "I don't know"), question=question)
         if rerun_unusable_resume_answers and is_unusable_answer(normalized_answer):
+            historical_answer = history_answer_map.get(task_id)
+            if historical_answer is not None:
+                restored_answer = normalize_answer(
+                    historical_answer.get("submitted_answer", "I don't know"),
+                    question=question,
+                )
+                if not is_unusable_answer(restored_answer):
+                    answers_by_index[idx] = {"task_id": task_id, "submitted_answer": restored_answer}
+                    historical_log = historical_answer.get("log", {})
+                    if not isinstance(historical_log, dict):
+                        historical_log = {}
+                    logs_by_index[idx] = {
+                        "Task ID": task_id,
+                        "Submitted Answer": restored_answer,
+                        "Level": level,
+                        "Latency (s)": historical_log.get("Latency (s)", ""),
+                        "Attempts": historical_log.get("Attempts", ""),
+                        "Stop Reason": historical_log.get("Stop Reason", "history_fallback"),
+                        "Task File Status": historical_log.get("Task File Status", ""),
+                        "Status": "resumed_history",
+                        "Source Cache": historical_answer.get("cache_path", ""),
+                    }
+                    restored_from_history_count += 1
+                    continue
             pending_entries.append(entry)
             continue
 
         answers_by_index[idx] = {"task_id": task_id, "submitted_answer": normalized_answer}
+        resumed_from_cache_count += 1
 
         cached_log = resumed_log_map.get(task_id, {})
         logs_by_index[idx] = {
@@ -440,7 +536,8 @@ def _generate_answers_concurrently(
     resumed_count = len(answers_by_index)
     print(
         f"Prepared {total_count} tasks for user '{username}'. "
-        f"Resumed {resumed_count} from cache; pending {len(pending_entries)}."
+        f"Resumed {resumed_from_cache_count} from cache; restored {restored_from_history_count} from history; "
+        f"pending {len(pending_entries)}."
     )
     print(
         f"Using {worker_count} workers. Per-task hard timeout: {task_timeout_seconds}s. "
@@ -662,6 +759,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Keep resumed 'I don't know' answers instead of rerunning them.",
     )
+    parser.add_argument(
+        "--no-history-fallback",
+        action="store_true",
+        help="Disable restoring usable answers from older caches for the same task_id.",
+    )
 
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
@@ -716,6 +818,7 @@ def main() -> None:
         resume=not args.no_resume,
         resume_cache_path=explicit_cache_path,
         rerun_unusable_resume_answers=not args.keep_idk_resume,
+        use_history_fallback=not args.no_history_fallback,
         task_timeout_seconds=max(0, int(args.task_timeout_seconds)),
         save_every=max(1, int(args.save_every)),
         limit=max(0, int(args.limit)),
