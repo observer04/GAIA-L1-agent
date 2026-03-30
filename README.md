@@ -79,4 +79,5 @@ Notes:
 - Username is resolved from `HF_TOKEN` / `HUGGINGFACEHUB_API_TOKEN` if `--username` is omitted.
 - Resume is enabled by default and reruns cached unusable answers (e.g., `I don't know`) automatically.
 - To keep prior IDK answers during resume, pass `--keep-idk-resume`.
+- To prevent long hangs on a single task, use `--task-timeout-seconds` (default: `1200`).
 - You can tune worker count with `--workers` or env var `GAIA_FAST_SUBMISSION_MAX_WORKERS`.

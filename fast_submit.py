@@ -5,7 +5,9 @@ import json
 import os
 import threading
 import time
+import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,6 +27,15 @@ _HF_TOKEN_ENV_KEYS = (
     "HUGGINGFACE_TOKEN",
     "HUGGING_FACE_HUB_TOKEN",
 )
+
+
+def _default_task_timeout_seconds() -> int:
+    raw_value = str(os.getenv("GAIA_FAST_TASK_TIMEOUT_SECONDS", "1200") or "").strip()
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        parsed = 1200
+    return max(0, parsed)
 
 
 def _fetch_questions(api_url: str) -> list[dict[str, Any]]:
@@ -171,6 +182,104 @@ def _run_task_with_thread_agent(config: AgentConfig, entry: dict[str, Any]) -> d
     )
 
 
+def _build_error_run_result(
+    stop_reason: str,
+    latency_seconds: float,
+    task_file_status: str = "error",
+) -> dict[str, Any]:
+    return {
+        "status": "error",
+        "submitted_answer": "I don't know",
+        "latency_seconds": round(float(latency_seconds), 3),
+        "attempt_count": 0,
+        "stop_reason": stop_reason,
+        "task_file_status": task_file_status,
+    }
+
+
+def _task_process_entrypoint(
+    config_payload: dict[str, Any],
+    entry: dict[str, Any],
+    result_queue: Any,
+) -> None:
+    try:
+        config = AgentConfig(**config_payload)
+        agent = GaiaLangGraphAgent(config=config)
+        result = agent.run_task(
+            question=str(entry.get("question", "")),
+            task_id=str(entry.get("task_id", "")),
+            run_label="submission",
+            level=str(entry.get("level", "")),
+            file_name=str(entry.get("file_name", "")),
+        )
+        result_queue.put({"ok": True, "result": result})
+    except Exception as err:  # noqa: BLE001
+        result_queue.put({"ok": False, "error": f"{err.__class__.__name__}: {err}"})
+
+
+def _run_task_with_hard_timeout(
+    config: AgentConfig,
+    entry: dict[str, Any],
+    task_timeout_seconds: int,
+) -> dict[str, Any]:
+    if int(task_timeout_seconds) <= 0:
+        return _run_task_with_thread_agent(config=config, entry=entry)
+
+    context = mp.get_context("spawn")
+    result_queue = context.Queue(maxsize=1)
+    started = time.perf_counter()
+
+    process = context.Process(
+        target=_task_process_entrypoint,
+        args=(asdict(config), entry, result_queue),
+    )
+    process.start()
+    process.join(int(task_timeout_seconds))
+
+    if process.is_alive():
+        process.terminate()
+        process.join(timeout=5)
+        if process.is_alive():
+            process.kill()
+            process.join(timeout=5)
+
+        elapsed = time.perf_counter() - started
+        try:
+            result_queue.close()
+            result_queue.join_thread()
+        except Exception:  # noqa: BLE001
+            pass
+        return _build_error_run_result(
+            stop_reason=f"task_timeout_{int(task_timeout_seconds)}s",
+            latency_seconds=elapsed,
+            task_file_status="timeout",
+        )
+
+    payload: dict[str, Any] = {}
+    try:
+        queue_result = result_queue.get(timeout=2)
+        if isinstance(queue_result, dict):
+            payload = queue_result
+    except Exception:  # noqa: BLE001
+        payload = {}
+    finally:
+        try:
+            result_queue.close()
+            result_queue.join_thread()
+        except Exception:  # noqa: BLE001
+            pass
+
+    elapsed = time.perf_counter() - started
+    if payload.get("ok") and isinstance(payload.get("result"), dict):
+        return payload["result"]
+
+    error_message = str(payload.get("error", "missing_result_from_task_process")).strip()
+    return _build_error_run_result(
+        stop_reason=f"task_process_error: {error_message}",
+        latency_seconds=elapsed,
+    )
+
+
 def _ordered_entries(questions: list[dict[str, Any]], limit: int = 0) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for idx, item in enumerate(questions):
@@ -257,6 +366,7 @@ def _generate_answers_concurrently(
     resume: bool,
     resume_cache_path: Path | None,
     rerun_unusable_resume_answers: bool,
+    task_timeout_seconds: int,
     save_every: int,
     limit: int,
 ) -> tuple[dict[str, Any], Path]:
@@ -332,7 +442,10 @@ def _generate_answers_concurrently(
         f"Prepared {total_count} tasks for user '{username}'. "
         f"Resumed {resumed_count} from cache; pending {len(pending_entries)}."
     )
-    print(f"Using {worker_count} workers. Cache path: {cache_path}")
+    print(
+        f"Using {worker_count} workers. Per-task hard timeout: {task_timeout_seconds}s. "
+        f"Cache path: {cache_path}"
+    )
 
     save_every = max(1, int(save_every))
     started_perf = time.perf_counter()
@@ -346,7 +459,11 @@ def _generate_answers_concurrently(
             level = str(entry["level"])
 
             try:
-                run_result = _run_task_with_thread_agent(config=config, entry=entry)
+                run_result = _run_task_with_hard_timeout(
+                    config=config,
+                    entry=entry,
+                    task_timeout_seconds=task_timeout_seconds,
+                )
             except Exception as err:  # noqa: BLE001
                 run_result = {
                     "status": "error",
@@ -396,7 +513,12 @@ def _generate_answers_concurrently(
     else:
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             future_map = {
-                executor.submit(_run_task_with_thread_agent, config, entry): entry
+                executor.submit(
+                    _run_task_with_hard_timeout,
+                    config,
+                    entry,
+                    task_timeout_seconds,
+                ): entry
                 for entry in pending_entries
             }
 
@@ -522,6 +644,15 @@ def parse_args() -> argparse.Namespace:
         help="Persist running cache every N completed tasks.",
     )
     parser.add_argument(
+        "--task-timeout-seconds",
+        type=int,
+        default=_default_task_timeout_seconds(),
+        help=(
+            "Hard timeout per task in seconds (0 disables hard timeout). "
+            "Default: 1200 or GAIA_FAST_TASK_TIMEOUT_SECONDS."
+        ),
+    )
+    parser.add_argument(
         "--no-resume",
         action="store_true",
         help="Disable resume from previous cache.",
@@ -585,6 +716,7 @@ def main() -> None:
         resume=not args.no_resume,
         resume_cache_path=explicit_cache_path,
         rerun_unusable_resume_answers=not args.keep_idk_resume,
+        task_timeout_seconds=max(0, int(args.task_timeout_seconds)),
         save_every=max(1, int(args.save_every)),
         limit=max(0, int(args.limit)),
     )
