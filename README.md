@@ -65,3 +65,17 @@ This avoids rerunning the whole benchmark every time submit is clicked and makes
 Optional async acceleration:
 
 - Set `GAIA_SUBMISSION_MAX_WORKERS` (default `2`, max `4`) to control threaded answer generation.
+
+### Fast concurrent CLI submission
+
+When local Gradio generation is too slow, use the CLI runner that mirrors the same cache/submit schema (`username`, `agent_code`, `answers`) and writes into `artifacts/submission_cache/`.
+
+- Generate + submit (concurrent): `python fast_submit.py --workers 8`
+- Generate cache only: `python fast_submit.py --workers 8 --cache-only`
+- Submit latest cached answers for your username: `python fast_submit.py --submit-only`
+
+Notes:
+
+- Username is resolved from `HF_TOKEN` / `HUGGINGFACEHUB_API_TOKEN` if `--username` is omitted.
+- Resume is enabled by default (it reuses your latest cache and only runs missing tasks).
+- You can tune worker count with `--workers` or env var `GAIA_FAST_SUBMISSION_MAX_WORKERS`.

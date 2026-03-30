@@ -141,7 +141,10 @@ def _generate_answers(
                 level=level,
                 file_name=file_name,
             )
-            submitted_answer = normalize_answer(run_result.get("submitted_answer", "I don't know"))
+            submitted_answer = normalize_answer(
+                run_result.get("submitted_answer", "I don't know"),
+                question=question,
+            )
             answers_by_index[idx] = {"task_id": task_id, "submitted_answer": submitted_answer}
             logs_by_index[idx] = {
                 "Task ID": task_id,
@@ -163,12 +166,12 @@ def _generate_answers(
                     question,
                     level,
                     file_name,
-                ): (idx, task_id, level)
+                ): (idx, task_id, level, question)
                 for idx, task_id, question, level, file_name in entries
             }
 
             for future in as_completed(future_map):
-                idx, task_id, level = future_map[future]
+                idx, task_id, level, question = future_map[future]
                 try:
                     run_result = future.result()
                 except Exception as err:  # noqa: BLE001
@@ -181,7 +184,10 @@ def _generate_answers(
                         "task_file_status": "error",
                     }
 
-                submitted_answer = normalize_answer(run_result.get("submitted_answer", "I don't know"))
+                submitted_answer = normalize_answer(
+                    run_result.get("submitted_answer", "I don't know"),
+                    question=question,
+                )
                 answers_by_index[idx] = {"task_id": task_id, "submitted_answer": submitted_answer}
                 logs_by_index[idx] = {
                     "Task ID": task_id,
