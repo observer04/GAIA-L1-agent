@@ -134,8 +134,10 @@ def test_trace_endpoints() -> None:
     assert missing_response.status_code == 404
 
 
-def test_prefixed_base_path_routes(monkeypatch) -> None:
+def test_prefixed_base_path_routes(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("WEB_BASE_PATH", "/gaia_agent")
+    # Ensure no frontend bundle is detected so root/base-path fallback metadata is returned.
+    monkeypatch.setenv("WEB_STATIC_DIR", str(tmp_path / "missing-dist"))
 
     app = create_app()
     app.dependency_overrides[get_agent_service] = lambda: FakeAgentService()
@@ -154,6 +156,14 @@ def test_prefixed_base_path_routes(monkeypatch) -> None:
     root = client.get("/")
     assert root.status_code == 200
     assert root.json()["docs"] == "/gaia_agent/docs"
+
+    prefixed_root = client.get("/gaia_agent")
+    assert prefixed_root.status_code == 200
+    assert prefixed_root.json()["docs"] == "/gaia_agent/docs"
+
+    prefixed_root_slash = client.get("/gaia_agent/")
+    assert prefixed_root_slash.status_code == 200
+    assert prefixed_root_slash.json()["docs"] == "/gaia_agent/docs"
 
 
 def test_prefixed_spa_serving(monkeypatch, tmp_path) -> None:

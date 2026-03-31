@@ -205,6 +205,13 @@ def create_app() -> FastAPI:
             "web": _join_route(base_path, "/") if has_frontend else "",
         }
 
+    if not has_frontend and base_path:
+
+        @app.get(base_path, include_in_schema=False, response_model=None)
+        @app.get(_join_route(base_path, "/"), include_in_schema=False, response_model=None)
+        def prefixed_root_info() -> dict[str, str]:
+            return root()
+
     @app.get(api_prefix)
     def api_root() -> dict[str, str]:
         return {
