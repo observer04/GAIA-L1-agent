@@ -7,9 +7,9 @@ export default {
       return fetch(request);
     }
 
-    const origin = (env.AZURE_ORIGIN || "").trim();
+    const origin = (env.BACKEND_ORIGIN || env.AZURE_ORIGIN || "").trim();
     if (!origin) {
-      return new Response("Missing AZURE_ORIGIN", { status: 500 });
+      return new Response("Missing BACKEND_ORIGIN", { status: 500 });
     }
 
     const upstream = new URL(url.toString());

@@ -1,0 +1,123 @@
+name: Deploy Modal Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployRoute:
+        description: Also deploy Cloudflare route worker with the new Modal origin
+        type: boolean
+        default: true
+      domain:
+        description: Root domain / zone name for Cloudflare route
+        required: false
+        default: "ommprakash.cloud"
+      pathPrefix:
+        description: Strict path prefix
+        required: false
+        default: "/gaia_agent"
+      workerName:
+        description: Cloudflare worker name
+        required: false
+        default: "gaia-agent-path-router"
+
+jobs:
+  deploy:
+    if: ${{ secrets.MODAL_TOKEN_ID != '' && secrets.MODAL_TOKEN_SECRET != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      modal_origin: ${{ steps.extract.outputs.modal_origin }}
+      modal_url: ${{ steps.extract.outputs.modal_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Modal and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install modal
+          pip install -r requirements.txt
+
+      - name: Configure Modal token
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          modal token set --token-id "$MODAL_TOKEN_ID" --token-secret "$MODAL_TOKEN_SECRET"
+
+      - name: Deploy Modal app
+        run: |
+          set -euo pipefail
+          modal deploy modal_app.py 2>&1 | tee /tmp/modal_deploy.log
+
+      - name: Extract Modal endpoint
+        id: extract
+        run: |
+          set -euo pipefail
+          MODAL_URL="$(grep -Eo 'https://[^ ]+\.modal\.run[^ ]*' /tmp/modal_deploy.log | head -n1 || true)"
+          if [ -z "$MODAL_URL" ]; then
+            echo "Could not find modal.run URL in deploy output"
+            exit 1
+          fi
+
+          MODAL_ORIGIN="$(echo "$MODAL_URL" | sed -E 's#https?://([^/]+).*#\1#')"
+
+          echo "modal_url=$MODAL_URL" >> "$GITHUB_OUTPUT"
+          echo "modal_origin=$MODAL_ORIGIN" >> "$GITHUB_OUTPUT"
+          echo "Modal URL: $MODAL_URL"
+          echo "Modal origin: $MODAL_ORIGIN"
+
+  route:
+    needs: deploy
+    if: ${{ github.event.inputs.deployRoute == 'true' && secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DOMAIN: ${{ github.event.inputs.domain }}
+      PATH_PREFIX: ${{ github.event.inputs.pathPrefix }}
+      WORKER_NAME: ${{ github.event.inputs.workerName }}
+      BACKEND_ORIGIN: ${{ needs.deploy.outputs.modal_origin }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+
+      - name: Deploy worker route
+        run: |
+          set -euo pipefail
+
+          if [[ "$PATH_PREFIX" != /* ]]; then
+            PATH_PREFIX="/$PATH_PREFIX"
+          fi
+
+          cat > /tmp/wrangler.toml <<EOF
+          name = "$WORKER_NAME"
+          main = "deploy/cloudflare/worker.js"
+          compatibility_date = "2026-03-31"
+
+          [vars]
+          BACKEND_ORIGIN = "$BACKEND_ORIGIN"
+
+          routes = [
+            { pattern = "$DOMAIN$PATH_PREFIX*", zone_name = "$DOMAIN" }
+          ]
+          EOF
+
+          wrangler deploy --config /tmp/wrangler.toml

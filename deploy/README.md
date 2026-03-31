@@ -10,6 +10,10 @@ Use the provided GitHub Actions workflow:
 - `.github/workflows/deploy-azure-containerapp.yml`
 - `.github/workflows/deploy-cloudflare-worker.yml` (publish strict `/gaia_agent` route worker)
 
+Optional Modal deploy entrypoint:
+
+- `modal_app.py` (`modal deploy modal_app.py`)
+
 Required repository secrets:
 
 - `AZURE_CREDENTIALS`
@@ -21,7 +25,8 @@ Cloudflare workflow secrets:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
-- optional `AZURE_ORIGIN_HOST` (if `azureOrigin` workflow input is omitted)
+- optional `BACKEND_ORIGIN_HOST` (preferred generic host)
+- optional `AZURE_ORIGIN_HOST` (legacy fallback)
 
 Container runtime env expectations:
 
@@ -53,6 +58,8 @@ If you prefer Worker-based path routing, start from:
 - `deploy/cloudflare/worker.example.js`
 - `deploy/cloudflare/wrangler.example.toml`
 - production worker entrypoint used by CI: `deploy/cloudflare/worker.js`
+
+For Modal as backend origin, set `BACKEND_ORIGIN` to the deployed host (for example `<workspace>--gaia-agent-api-fastapi-app.modal.run`).
 
 ## 3) Rollout validation
 

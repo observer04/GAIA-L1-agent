@@ -3,8 +3,8 @@ main = "worker.example.js"
 compatibility_date = "2026-03-31"
 
 [vars]
-# Example: <your-container-app>.<region>.azurecontainerapps.io
-AZURE_ORIGIN = "replace-with-azure-origin-hostname"
+# Example: <your-container-app>.<region>.azurecontainerapps.io OR <app>.modal.run
+BACKEND_ORIGIN = "replace-with-backend-origin-hostname"
 
 # Route only strict /gaia_agent path
 routes = [

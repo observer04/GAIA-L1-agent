@@ -119,6 +119,11 @@ Local container options:
 - `deploy/README.md`: Cloudflare + Azure path-routing deployment checklist and runtime env guide
 - `deploy/operations-runbook.md`: rollout and rollback operations playbook
 
+Modal option:
+
+- Deploy backend directly on Modal: `modal deploy modal_app.py`
+- Then point Cloudflare worker `BACKEND_ORIGIN` (or secret `BACKEND_ORIGIN_HOST`) to the Modal host.
+
 ### Notes
 
 - Submission answers are normalized to avoid prefix/wrapper mismatches.

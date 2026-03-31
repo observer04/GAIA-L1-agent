@@ -15,8 +15,12 @@ on:
         description: Worker name
         required: false
         default: "gaia-agent-path-router"
+      backendOrigin:
+        description: Backend origin hostname (without https://), e.g. *.azurecontainerapps.io or *.modal.run
+        required: false
+        default: ""
       azureOrigin:
-        description: Azure origin hostname (without https://)
+        description: (Legacy) Azure origin hostname (without https://)
         required: false
         default: ""
 
@@ -32,7 +36,9 @@ jobs:
       INPUT_DOMAIN: ${{ github.event.inputs.domain }}
       INPUT_PATH_PREFIX: ${{ github.event.inputs.pathPrefix }}
       INPUT_WORKER_NAME: ${{ github.event.inputs.workerName }}
+      INPUT_BACKEND_ORIGIN: ${{ github.event.inputs.backendOrigin }}
       INPUT_AZURE_ORIGIN: ${{ github.event.inputs.azureOrigin }}
+      SECRET_BACKEND_ORIGIN: ${{ secrets.BACKEND_ORIGIN_HOST }}
       SECRET_AZURE_ORIGIN: ${{ secrets.AZURE_ORIGIN_HOST }}
 
     steps:
@@ -54,13 +60,21 @@ jobs:
           DOMAIN="${INPUT_DOMAIN:-ommprakash.cloud}"
           PATH_PREFIX="${INPUT_PATH_PREFIX:-/gaia_agent}"
           WORKER_NAME="${INPUT_WORKER_NAME:-gaia-agent-path-router}"
-          AZURE_ORIGIN="${INPUT_AZURE_ORIGIN:-}"
-          if [ -z "$AZURE_ORIGIN" ]; then
-            AZURE_ORIGIN="${SECRET_AZURE_ORIGIN:-}"
+          BACKEND_ORIGIN="${INPUT_BACKEND_ORIGIN:-}"
+          if [ -z "$BACKEND_ORIGIN" ]; then
+            BACKEND_ORIGIN="${SECRET_BACKEND_ORIGIN:-}"
           fi
 
-          if [ -z "$AZURE_ORIGIN" ]; then
-            echo "Missing Azure origin host. Provide workflow input azureOrigin or secret AZURE_ORIGIN_HOST."
+          # Backward-compatibility for older input/secret names
+          if [ -z "$BACKEND_ORIGIN" ]; then
+            BACKEND_ORIGIN="${INPUT_AZURE_ORIGIN:-}"
+          fi
+          if [ -z "$BACKEND_ORIGIN" ]; then
+            BACKEND_ORIGIN="${SECRET_AZURE_ORIGIN:-}"
+          fi
+
+          if [ -z "$BACKEND_ORIGIN" ]; then
+            echo "Missing backend origin host. Provide input backendOrigin (or legacy azureOrigin) or set BACKEND_ORIGIN_HOST/AZURE_ORIGIN_HOST secret."
             exit 1
           fi
 
@@ -74,7 +88,7 @@ jobs:
           compatibility_date = "2026-03-31"
 
           [vars]
-          AZURE_ORIGIN = "$AZURE_ORIGIN"
+          BACKEND_ORIGIN = "$BACKEND_ORIGIN"
 
           routes = [
             { pattern = "$DOMAIN$PATH_PREFIX*", zone_name = "$DOMAIN" }

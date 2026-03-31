@@ -27,3 +27,4 @@ python-dotenv
 youtube-transcript-api
 pymupdf
 arxiv
+modal
