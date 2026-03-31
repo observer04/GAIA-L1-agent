@@ -114,6 +114,7 @@ Local container options:
 - `.github/workflows/frontend-ci.yml`: frontend install + `tsc --noEmit` + production build
 - `.github/workflows/deploy-gaia-agent.yml`: deploy + smoke-gated promotion (+ optional rollback)
 - `.github/workflows/deploy-azure-containerapp.yml`: manual Azure Container Apps deploy-only scaffold
+- `.github/workflows/deploy-cloudflare-worker.yml`: Cloudflare Worker route deployment for strict `/gaia_agent`
 - `.github/workflows/rollout-smoke.yml`: manual post-deploy smoke checks against configured base URL
 - `deploy/README.md`: Cloudflare + Azure path-routing deployment checklist and runtime env guide
 - `deploy/operations-runbook.md`: rollout and rollback operations playbook

@@ -7,6 +7,7 @@ This runbook covers rollout and rollback for the GAIA app served at `/gaia_agent
 - Ensure backend/frontend CI workflows are green.
 - Verify container image exists in ACR for target commit.
 - Verify runtime env vars are configured in Container Apps.
+- Ensure Cloudflare route worker is deployed (`deploy-cloudflare-worker.yml`) when `/gaia_agent` routing has changed.
 - Run smoke checks against the current production URL.
 
 ## Rollout (Azure Container Apps)

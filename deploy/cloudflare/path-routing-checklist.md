@@ -19,3 +19,4 @@ Goal: serve the app at `https://<your-domain>/gaia_agent` while Azure Container 
 - Keep `WEB_BASE_PATH=/gaia_agent` in the Azure runtime to ensure docs, API endpoints, and SPA fallback stay prefix-correct.
 - If your origin rewrites host headers, ensure the forwarded host still matches your app expectations.
 - Worker template is available at `deploy/cloudflare/worker.example.js` with sample `wrangler` config at `deploy/cloudflare/wrangler.example.toml`.
+- Automated deployment path is available via `.github/workflows/deploy-cloudflare-worker.yml`.
