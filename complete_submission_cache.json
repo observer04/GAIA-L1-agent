@@ -1,0 +1,288 @@
+{
+  "username": "Observer04",
+  "agent_code": "https://huggingface.co/spaces/<your-space>/tree/main",
+  "generated_at": "2026-03-30T15:06:23.969663+00:00",
+  "started_at": "2026-03-30T13:37:37.909229+00:00",
+  "completed_at": "2026-03-30T17:13:42+00:00",
+  "worker_count": 1,
+  "question_count": 20,
+  "answers": [
+    {
+      "task_id": "8e867cd7-cff9-4e6c-867a-ff5ddc2550be",
+      "submitted_answer": "3"
+    },
+    {
+      "task_id": "a1e91b78-d3d8-4675-bb8d-62741b4b68a6",
+      "submitted_answer": "3"
+    },
+    {
+      "task_id": "2d83110e-a098-4ebb-9987-066c06fa42d0",
+      "submitted_answer": "Right"
+    },
+    {
+      "task_id": "cca530fc-4052-43b2-b130-b30968d8aa44",
+      "submitted_answer": "Rd5"
+    },
+    {
+      "task_id": "4fc2f1ae-8625-45b5-ab34-ad4433bc21f8",
+      "submitted_answer": "FunkMonk"
+    },
+    {
+      "task_id": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
+      "submitted_answer": "b, e"
+    },
+    {
+      "task_id": "9d191bce-651d-4746-be2d-7ef8ecadb9c2",
+      "submitted_answer": "Extremely"
+    },
+    {
+      "task_id": "cabe07ed-9eca-40ea-8ead-410ef5e83f91",
+      "submitted_answer": "Louvrier"
+    },
+    {
+      "task_id": "3cef3a44-215e-4aed-8e3b-b1e3f08063b7",
+      "submitted_answer": "broccoli, celery, fresh basil, lettuce, sweet potatoes"
+    },
+    {
+      "task_id": "99c9cc74-fdc8-46c6-8f8d-3ce2d3bfeea3",
+      "submitted_answer": "cornstarch, freshly squeezed lemon juice, granulated sugar, pure vanilla extract, ripe strawberries"
+    },
+    {
+      "task_id": "305ac316-eef6-4446-960a-92d80d542f82",
+      "submitted_answer": "Wojciech"
+    },
+    {
+      "task_id": "f918266a-b3e0-4914-865d-4faa564f1aef",
+      "submitted_answer": "0"
+    },
+    {
+      "task_id": "3f57289b-8c60-48be-bd80-01f8099ca449",
+      "submitted_answer": "519"
+    },
+    {
+      "task_id": "1f975693-876d-457b-a649-393859e79bf3",
+      "submitted_answer": "132, 133, 134, 197, 245"
+    },
+    {
+      "task_id": "840bfca7-4f7b-481a-8794-c560c340185d",
+      "submitted_answer": "80GSFC21M0002"
+    },
+    {
+      "task_id": "bda648d7-d618-4883-88f4-3466eabd860e",
+      "submitted_answer": "Saint Petersburg"
+    },
+    {
+      "task_id": "cf106601-ab4f-4af9-b045-5295fe67b37d",
+      "submitted_answer": "CUB"
+    },
+    {
+      "task_id": "a0c07678-e491-4bbc-8f0b-07405144218f",
+      "submitted_answer": "Yoshida, Uehara"
+    },
+    {
+      "task_id": "7bd855d8-463d-4ed5-93ca-5fe35145f733",
+      "submitted_answer": "89706.00"
+    },
+    {
+      "task_id": "5a0c1adf-205e-4841-a666-7c3ef95def9d",
+      "submitted_answer": "Claus"
+    }
+  ],
+  "results_log": [
+    {
+      "Task ID": "8e867cd7-cff9-4e6c-867a-ff5ddc2550be",
+      "Submitted Answer": "3",
+      "Level": "1",
+      "Latency (s)": 464.646,
+      "Attempts": 7,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "a1e91b78-d3d8-4675-bb8d-62741b4b68a6",
+      "Submitted Answer": "3",
+      "Level": "1",
+      "Latency (s)": 653.983,
+      "Attempts": 10,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "resumed_history",
+      "Source Cache": "artifacts/submission_cache/submission_cache_observer04_20260330_132556.json"
+    },
+    {
+      "Task ID": "2d83110e-a098-4ebb-9987-066c06fa42d0",
+      "Submitted Answer": "right",
+      "Level": "1",
+      "Latency (s)": 43.855,
+      "Attempts": 1,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "cca530fc-4052-43b2-b130-b30968d8aa44",
+      "Submitted Answer": "Qxc3",
+      "Level": "1",
+      "Latency (s)": 369.551,
+      "Attempts": 4,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "downloaded",
+      "Status": "success"
+    },
+    {
+      "Task ID": "4fc2f1ae-8625-45b5-ab34-ad4433bc21f8",
+      "Submitted Answer": "FunkMonk",
+      "Level": "1",
+      "Latency (s)": 126.736,
+      "Attempts": 4,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
+      "Submitted Answer": "b, e",
+      "Level": "1",
+      "Latency (s)": 142.6,
+      "Attempts": 2,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "9d191bce-651d-4746-be2d-7ef8ecadb9c2",
+      "Submitted Answer": "Extremely.",
+      "Level": "1",
+      "Latency (s)": 207.636,
+      "Attempts": 6,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "resumed_history",
+      "Source Cache": "artifacts/submission_cache/submission_cache_observer04_20260330_130229.json"
+    },
+    {
+      "Task ID": "cabe07ed-9eca-40ea-8ead-410ef5e83f91",
+      "Submitted Answer": "Louvrier",
+      "Level": "1",
+      "Latency (s)": 153.899,
+      "Attempts": 5,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "3cef3a44-215e-4aed-8e3b-b1e3f08063b7",
+      "Submitted Answer": "broccoli, celery, fresh basil, lettuce, sweet potatoes",
+      "Level": "1",
+      "Latency (s)": 588.295,
+      "Attempts": 3,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "99c9cc74-fdc8-46c6-8f8d-3ce2d3bfeea3",
+      "Submitted Answer": "cornstarch, freshly squeezed lemon juice, granulated sugar, pure vanilla extract, ripe strawberries",
+      "Level": "1",
+      "Latency (s)": 129.754,
+      "Attempts": 2,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "downloaded",
+      "Status": "success"
+    },
+    {
+      "Task ID": "305ac316-eef6-4446-960a-92d80d542f82",
+      "Submitted Answer": "Wojciech",
+      "Level": "1",
+      "Latency (s)": 141.309,
+      "Attempts": 4,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "f918266a-b3e0-4914-865d-4faa564f1aef",
+      "Submitted Answer": "0",
+      "Level": "1",
+      "Latency (s)": 59.594,
+      "Attempts": 4,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "downloaded",
+      "Status": "success"
+    },
+    {
+      "Task ID": "3f57289b-8c60-48be-bd80-01f8099ca449",
+      "Submitted Answer": "519",
+      "Level": "1",
+      "Latency (s)": 90.178,
+      "Attempts": 5,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "1f975693-876d-457b-a649-393859e79bf3",
+      "Submitted Answer": "100, 132, 133, 134, 197, 245",
+      "Level": "1",
+      "Latency (s)": 213.919,
+      "Attempts": 7,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "downloaded",
+      "Status": "success"
+    },
+    {
+      "Task ID": "840bfca7-4f7b-481a-8794-c560c340185d",
+      "Submitted Answer": "80GSFC21M0002",
+      "Level": "1",
+      "Latency (s)": 335.205,
+      "Attempts": 7,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "bda648d7-d618-4883-88f4-3466eabd860e",
+      "Submitted Answer": "Saint Petersburg",
+      "Level": "1",
+      "Latency (s)": 374.452,
+      "Attempts": 4,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "cf106601-ab4f-4af9-b045-5295fe67b37d",
+      "Submitted Answer": "CUB",
+      "Level": "1",
+      "Latency (s)": 655.499,
+      "Attempts": 11,
+      "Stop Reason": "synthesized_after_search_budget",
+      "Task File Status": "no_file",
+      "Status": "success"
+    },
+    {
+      "Task ID": "7bd855d8-463d-4ed5-93ca-5fe35145f733",
+      "Submitted Answer": "89706",
+      "Level": "1",
+      "Latency (s)": 205.666,
+      "Attempts": 8,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "downloaded",
+      "Status": "resumed_history",
+      "Source Cache": "artifacts/submission_cache/submission_cache_observer04_20260330_130229.json"
+    },
+    {
+      "Task ID": "5a0c1adf-205e-4841-a666-7c3ef95def9d",
+      "Submitted Answer": "Claus",
+      "Level": "1",
+      "Latency (s)": 1372.097,
+      "Attempts": 12,
+      "Stop Reason": "sufficient_evidence",
+      "Task File Status": "no_file",
+      "Status": "success"
+    }
+  ],
+  "status": "complete",
+  "resumed_from_cache": "artifacts/submission_cache/submission_cache_observer04_20260330_133737.json"
+}
