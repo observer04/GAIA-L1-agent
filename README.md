@@ -23,6 +23,8 @@ This branch starts a modular LangGraph-based GAIA agent implementation.
 - `app.py`: Gradio submission UI and API loop.
 - `agent/graph.py`: staged LangGraph workflow and agent wrapper.
 - `agent/tools/core.py`: hardened tool suite (web, download, python, pdf/text/tabular/image).
+- `backend/main.py`: FastAPI backend (`/api/health`, `/api/chat`, `/api/chat/stream`, `/api/traces/{run_id}`).
+- `frontend/src/App.tsx`: React app with GPT-style chat + trace inspector panel.
 - `langgraph.json`: local LangGraph Studio configuration.
 
 ### Local validation
@@ -40,9 +42,81 @@ This branch starts a modular LangGraph-based GAIA agent implementation.
        - optional Google fallback path: `GOOGLE_SEARCH_API_KEY=...`, `GOOGLE_CSE_ID=...` (Custom Search API)
    - optional attachment fallback for `/files/{task_id}` outages:
      - `HF_TOKEN=...` (or `HUGGINGFACEHUB_API_TOKEN=...`) with accepted access to `gaia-benchmark/GAIA`
+   - optional web/API runtime settings:
+     - `WEB_PUBLIC_MODE=true|false` (default `false`)
+     - `AGENT_ALLOW_UNSAFE_TOOLS=true|false` (default `false`; only applied when `WEB_PUBLIC_MODE=true`)
+     - `WEB_MAX_PROMPT_CHARS=24000`
+     - `WEB_STREAM_ANSWER_CHUNK_CHARS=64`
+     - `WEB_TRACE_STORE_MAX_RUNS=200`
+     - `WEB_CORS_ORIGINS=http://localhost:5173`
+     - `WEB_BASE_PATH=/gaia_agent` (serve API + SPA under a strict path prefix)
+     - `WEB_STATIC_DIR=/absolute/path/to/frontend/dist` (optional explicit frontend dist directory)
+     - `WEB_RATE_LIMIT_ENABLED=true|false` (default `true`, applies to chat endpoints)
+     - `WEB_RATE_LIMIT_REQUESTS_PER_MINUTE=30`
+     - `WEB_RATE_LIMIT_WINDOW_SECONDS=60`
+     - `WEB_ENABLE_HSTS=true|false` (default `false`; enable only for HTTPS deployments)
 2. Install dependencies from `requirements.txt`.
 3. Run the app locally for end-to-end checks.
 4. Use LangGraph Studio with `langgraph.json` to inspect multi-turn traces and tool routing.
+
+### FastAPI + React local run
+
+Backend (FastAPI):
+
+- `uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`
+
+Frontend (React + Vite):
+
+- `npm --prefix frontend install`
+- `npm --prefix frontend run dev`
+
+Optional frontend path env vars:
+
+- `VITE_BASE_PATH=/gaia_agent/` for production asset URLs (defaults to `/gaia_agent/` during build)
+- `VITE_APP_BASE_PATH=/gaia_agent` to force API path prefix detection
+- `VITE_API_BASE_URL=https://your-host/gaia_agent/api` to fully override API base
+
+Useful URLs:
+
+- API docs: `http://localhost:8000/docs`
+- API health: `http://localhost:8000/api/health`
+- Frontend app: `http://localhost:5173`
+
+Strict prefix example (single-service mode):
+
+- Set `WEB_BASE_PATH=/gaia_agent`
+- API health: `http://localhost:8000/gaia_agent/api/health`
+- API docs: `http://localhost:8000/gaia_agent/docs`
+- SPA root: `http://localhost:8000/gaia_agent/`
+
+### Validation commands
+
+- Python tests: `pytest -q`
+- Frontend production build: `npm --prefix frontend run build`
+- Rollout smoke check (deployed path): `python scripts/rollout_smoke.py --base-url https://ommprakash.cloud/gaia_agent`
+
+### Containerized run
+
+The repository now includes a multi-stage fullstack image build (`Dockerfile`) that:
+
+- builds the React frontend with `VITE_BASE_PATH=/gaia_agent/`
+- serves FastAPI + built SPA from one container
+- defaults to strict routing at `/gaia_agent`
+
+Local container options:
+
+- Build manually from `Dockerfile`, then run on port `8000`
+- Or use `docker-compose.yml` for local orchestration with `.env`
+
+### CI and deployment scaffolds
+
+- `.github/workflows/backend-ci.yml`: Python dependency install + `pytest -q`
+- `.github/workflows/frontend-ci.yml`: frontend install + `tsc --noEmit` + production build
+- `.github/workflows/deploy-gaia-agent.yml`: deploy + smoke-gated promotion (+ optional rollback)
+- `.github/workflows/deploy-azure-containerapp.yml`: manual Azure Container Apps deploy-only scaffold
+- `.github/workflows/rollout-smoke.yml`: manual post-deploy smoke checks against configured base URL
+- `deploy/README.md`: Cloudflare + Azure path-routing deployment checklist and runtime env guide
+- `deploy/operations-runbook.md`: rollout and rollback operations playbook
 
 ### Notes
 

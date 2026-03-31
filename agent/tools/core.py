@@ -2237,9 +2237,15 @@ def inspect_local_file(file_path: str) -> str:
         return f"ERROR: failed to inspect file ({err})"
 
 
-def get_tools() -> List:
+def get_tools(public_mode: bool | None = None, allow_unsafe_tools: bool | None = None) -> List:
     """Return the default tool set for the GAIA LangGraph agent."""
-    return [
+    config = AgentConfig.from_env()
+    resolved_public_mode = config.web_public_mode if public_mode is None else bool(public_mode)
+    resolved_allow_unsafe = (
+        config.allow_unsafe_tools if allow_unsafe_tools is None else bool(allow_unsafe_tools)
+    )
+
+    tools: List = [
         download_task_file,
         analyze_image_with_vlm,
         web_search,
@@ -2248,15 +2254,23 @@ def get_tools() -> List:
         fetch_wikipedia_section,
         get_youtube_video_context,
         download_url_file,
-        execute_python,
-        execute_bash,
-        read_text_file,
-        extract_pdf_text,
-        inspect_tabular_file,
-        extract_office_text,
-        inspect_archive_file,
-        transcribe_audio_file,
-        ocr_image_file,
-        list_working_directory,
-        inspect_local_file,
     ]
+
+    include_unsafe_tools = (not resolved_public_mode) or resolved_allow_unsafe
+    if include_unsafe_tools:
+        tools.extend([execute_python, execute_bash])
+
+    tools.extend(
+        [
+            read_text_file,
+            extract_pdf_text,
+            inspect_tabular_file,
+            extract_office_text,
+            inspect_archive_file,
+            transcribe_audio_file,
+            ocr_image_file,
+            list_working_directory,
+            inspect_local_file,
+        ]
+    )
+    return tools

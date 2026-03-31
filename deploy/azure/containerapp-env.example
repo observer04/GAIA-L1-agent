@@ -1,0 +1,13 @@
+# Runtime env vars for Azure Container Apps
+WEB_BASE_PATH=/gaia_agent
+WEB_STATIC_DIR=/app/frontend/dist
+WEB_PUBLIC_MODE=true
+AGENT_ALLOW_UNSAFE_TOOLS=false
+WEB_CORS_ORIGINS=https://ommprakash.cloud
+
+# Required for model/tool execution
+GOOGLE_API_KEY=<set-me>
+HF_TOKEN=<set-me>
+
+# Optional
+TAVILY_API_KEY=<set-me>

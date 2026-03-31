@@ -1,0 +1,15 @@
+.git/
+.gitignore
+.gitattributes
+.venv/
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+artifacts/
+secrets/
+frontend/node_modules/
+frontend/dist/

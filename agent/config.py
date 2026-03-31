@@ -45,6 +45,11 @@ class AgentConfig:
     local_working_dir: str = "/tmp/gaia_agent"
     enable_langsmith_tracing: bool = False
     langsmith_project: str = "gaia-langgraph-local"
+    web_public_mode: bool = False
+    allow_unsafe_tools: bool = False
+    web_max_prompt_chars: int = 24000
+    stream_answer_chunk_chars: int = 64
+    trace_store_max_runs: int = 200
 
     @staticmethod
     def _as_bool(value: str | None, default: bool = False) -> bool:
@@ -89,6 +94,26 @@ class AgentConfig:
             local_working_dir=working_dir,
             enable_langsmith_tracing=tracing_enabled,
             langsmith_project=os.getenv("LANGSMITH_PROJECT", cls.langsmith_project),
+            web_public_mode=cls._as_bool(
+                os.getenv("WEB_PUBLIC_MODE"),
+                cls.web_public_mode,
+            ),
+            allow_unsafe_tools=cls._as_bool(
+                os.getenv("AGENT_ALLOW_UNSAFE_TOOLS"),
+                cls.allow_unsafe_tools,
+            ),
+            web_max_prompt_chars=_get_int(
+                "WEB_MAX_PROMPT_CHARS",
+                cls.web_max_prompt_chars,
+            ),
+            stream_answer_chunk_chars=_get_int(
+                "WEB_STREAM_ANSWER_CHUNK_CHARS",
+                cls.stream_answer_chunk_chars,
+            ),
+            trace_store_max_runs=_get_int(
+                "WEB_TRACE_STORE_MAX_RUNS",
+                cls.trace_store_max_runs,
+            ),
         )
 
     def assert_required(self) -> None:

@@ -1,0 +1,143 @@
+name: Deploy GAIA Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseUrl:
+        description: Base URL with strict path, e.g. https://ommprakash.cloud/gaia_agent
+        required: false
+        default: ""
+      skipChat:
+        description: Skip streaming chat smoke check
+        type: boolean
+        default: false
+      rollbackOnFail:
+        description: Roll back to previous image if smoke fails
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    if: ${{ secrets.AZURE_CREDENTIALS != '' && secrets.AZURE_CONTAINER_REGISTRY != '' && secrets.AZURE_RESOURCE_GROUP != '' && secrets.AZURE_CONTAINER_APP != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      previous_image: ${{ steps.capture_previous.outputs.previous_image }}
+      deployed_image: ${{ steps.build_push.outputs.deployed_image }}
+    env:
+      IMAGE_NAME: gaia-agent
+      IMAGE_TAG: ${{ github.sha }}
+      REGISTRY_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      CONTAINER_APP: ${{ secrets.AZURE_CONTAINER_APP }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Capture previous image
+        id: capture_previous
+        run: |
+          CURRENT_IMAGE="$(az containerapp show --name "$CONTAINER_APP" --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[0].image" -o tsv || true)"
+          echo "previous_image=$CURRENT_IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name "$REGISTRY_NAME"
+
+      - name: Build and push image
+        id: build_push
+        run: |
+          IMAGE_URI="$REGISTRY_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG"
+          docker build --build-arg VITE_BASE_PATH=/gaia_agent/ -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "deployed_image=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Update Azure Container App
+        run: |
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "${{ steps.build_push.outputs.deployed_image }}" \
+            --set-env-vars \
+              WEB_BASE_PATH=/gaia_agent \
+              WEB_STATIC_DIR=/app/frontend/dist \
+              WEB_PUBLIC_MODE=true \
+              AGENT_ALLOW_UNSAFE_TOOLS=false
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run smoke validation
+        env:
+          INPUT_BASE_URL: ${{ github.event.inputs.baseUrl }}
+          SECRET_BASE_URL: ${{ secrets.GAIA_DEPLOY_BASE_URL }}
+          SKIP_CHAT: ${{ github.event.inputs.skipChat }}
+        run: |
+          BASE_URL="$INPUT_BASE_URL"
+          if [ -z "$BASE_URL" ]; then
+            BASE_URL="$SECRET_BASE_URL"
+          fi
+
+          if [ -z "$BASE_URL" ]; then
+            echo "Missing base URL. Provide workflow input baseUrl or secret GAIA_DEPLOY_BASE_URL."
+            exit 1
+          fi
+
+          SKIP_FLAG=""
+          if [ "$SKIP_CHAT" = "true" ]; then
+            SKIP_FLAG="--skip-chat"
+          fi
+
+          python scripts/rollout_smoke.py --base-url "$BASE_URL" $SKIP_FLAG
+
+  rollback:
+    needs: [deploy, smoke]
+    if: ${{ always() && needs.smoke.result == 'failure' && github.event.inputs.rollbackOnFail == 'true' && needs.deploy.outputs.previous_image != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      CONTAINER_APP: ${{ secrets.AZURE_CONTAINER_APP }}
+
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Roll back to previous image
+        run: |
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "${{ needs.deploy.outputs.previous_image }}"

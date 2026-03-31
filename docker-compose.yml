@@ -1,0 +1,16 @@
+services:
+  gaia-agent:
+    build:
+      context: .
+      args:
+        VITE_BASE_PATH: /gaia_agent/
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      WEB_BASE_PATH: /gaia_agent
+      WEB_STATIC_DIR: /app/frontend/dist
+      WEB_PUBLIC_MODE: "true"
+      AGENT_ALLOW_UNSAFE_TOOLS: "false"
+      WEB_CORS_ORIGINS: "*"

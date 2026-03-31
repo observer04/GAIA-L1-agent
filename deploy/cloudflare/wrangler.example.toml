@@ -1,0 +1,12 @@
+name = "gaia-agent-path-router"
+main = "worker.example.js"
+compatibility_date = "2026-03-31"
+
+[vars]
+# Example: <your-container-app>.<region>.azurecontainerapps.io
+AZURE_ORIGIN = "replace-with-azure-origin-hostname"
+
+# Route only strict /gaia_agent path
+routes = [
+  { pattern = "ommprakash.cloud/gaia_agent*", zone_name = "ommprakash.cloud" }
+]

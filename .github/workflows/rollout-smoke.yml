@@ -1,0 +1,57 @@
+name: Rollout Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseUrl:
+        description: Base URL with path prefix, e.g. https://ommprakash.cloud/gaia_agent
+        required: false
+        default: ""
+      skipChat:
+        description: Skip chat stream check
+        type: boolean
+        default: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run smoke validation
+        env:
+          INPUT_BASE_URL: ${{ github.event.inputs.baseUrl }}
+          SECRET_BASE_URL: ${{ secrets.GAIA_DEPLOY_BASE_URL }}
+          SKIP_CHAT: ${{ github.event.inputs.skipChat }}
+        run: |
+          BASE_URL="$INPUT_BASE_URL"
+          if [ -z "$BASE_URL" ]; then
+            BASE_URL="$SECRET_BASE_URL"
+          fi
+
+          if [ -z "$BASE_URL" ]; then
+            echo "Missing base URL. Provide workflow input baseUrl or secret GAIA_DEPLOY_BASE_URL."
+            exit 1
+          fi
+
+          SKIP_FLAG=""
+          if [ "$SKIP_CHAT" = "true" ]; then
+            SKIP_FLAG="--skip-chat"
+          fi
+
+          python scripts/rollout_smoke.py --base-url "$BASE_URL" $SKIP_FLAG

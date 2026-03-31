@@ -1,4 +1,6 @@
 gradio[oauth]
+fastapi
+uvicorn[standard]
 requests
 pandas
 pillow

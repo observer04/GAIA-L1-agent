@@ -63,7 +63,10 @@ class GaiaLangGraphAgent:
         self.config = config or AgentConfig.from_env()
         self.config.assert_required()
 
-        self.tools = get_tools()
+        self.tools = get_tools(
+            public_mode=self.config.web_public_mode,
+            allow_unsafe_tools=self.config.allow_unsafe_tools,
+        )
         self.tool_node = ToolNode(self.tools)
         self.llm = ChatGoogleGenerativeAI(
             model=self.config.model_name,
